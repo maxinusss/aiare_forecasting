@@ -1,8 +1,12 @@
+import os
 from pathlib import Path
 import pandas as pd
 
+# Set working directory to project root (parent of eda folder)
+os.chdir(Path(__file__).parent.parent)
 
-def combine_course_enrollment(folder_path: str) -> pd.DataFrame:
+
+def combine_course_enrollment(folder_path: str, output_path: str) -> pd.DataFrame:
     """
     Read all CSV files in a folder that match the course-export shape,
     and return a combined dataset with:
@@ -12,6 +16,10 @@ def combine_course_enrollment(folder_path: str) -> pd.DataFrame:
     - course column is "Course Type Name"
     - date column is "Start Date"
     - enrolled column is "Enrolled"
+    
+    Args:
+        folder_path: Path to folder containing CSV files
+        output_path: Path to save the combined CSV file
     """
     folder = Path(folder_path)
     csv_files = list(folder.glob("*.csv"))
@@ -57,10 +65,15 @@ def combine_course_enrollment(folder_path: str) -> pd.DataFrame:
         .reset_index(drop=True)
     )
 
+    # Create output directory if it doesn't exist
+    output_file = Path(output_path)
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    result.to_csv(output_file, index=False)
+
     return result
 
 
-def combine_student_counts(folder_path: str) -> pd.DataFrame:
+def combine_student_counts(folder_path: str, output_path: str) -> pd.DataFrame:
     """
     Read all CSV files in a folder that match the student-export shape,
     and return a combined dataset with:
@@ -72,6 +85,10 @@ def combine_student_counts(folder_path: str) -> pd.DataFrame:
     - state column is "Course State"
     - travel mode column is "Course Mode of Travel"
     - date column is "Course Start Date"
+    
+    Args:
+        folder_path: Path to folder containing CSV files
+        output_path: Path to save the combined CSV file
     """
     folder = Path(folder_path)
     csv_files = list(folder.glob("*.csv"))
@@ -153,10 +170,18 @@ def combine_student_counts(folder_path: str) -> pd.DataFrame:
         .reset_index(drop=True)
     )
 
+    # Create output directory if it doesn't exist
+    output_file = Path(output_path)
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    result.to_csv(output_file, index=False)
+
     return result
 
-courses = combine_course_enrollment("data/raw_data/Courses")
-students = combine_student_counts("data/raw_data/Students")
 
-courses.to_csv("data/combined_data/course_enrollment.csv", index=False)
-students.to_csv("data/combined_data/student_counts.csv", index=False)
+#combine course and student information at correct level
+courses = combine_course_enrollment(
+    "data/raw_data/Courses", "data/cleaned_data/course_enrollment.csv"
+)
+students = combine_student_counts(
+    "data/raw_data/Students", "data/cleaned_data/student_enrollment.csv"
+)

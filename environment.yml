@@ -1,4 +1,4 @@
-name: aiare-forecasting
+name: course_analysis
 channels:
   - conda-forge
   - defaults

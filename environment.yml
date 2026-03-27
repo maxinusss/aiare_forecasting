@@ -1,0 +1,20 @@
+name: aiare-forecasting
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.11
+  - pandas
+  - numpy
+  - pip
+
+  # Optional but useful for working with CSVs and dates
+  - python-dateutil
+
+  # If you plan to open/edit in notebooks
+  - jupyterlab
+
+  # Pip section (only if you later add non-conda deps)
+  - pip:
+      []

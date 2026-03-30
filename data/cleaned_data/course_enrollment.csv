@@ -1,285 +1,224 @@
-month,year,course,enrolled
-3,2013,AIARE 1,1
-7,2017,AIARE 1,30
-7,2017,AIARE 2,12
-7,2017,Avalanche Rescue,29
-8,2017,AIARE 1,63
-8,2017,AIARE 2,15
-8,2017,Avalanche Rescue,5
-9,2017,AIARE 2,11
-9,2017,Avalanche Rescue,8
-11,2017,AIARE 1,95
-11,2017,Avalanche Rescue,34
-12,2017,AIARE 1,1768
-12,2017,AIARE 2,47
-12,2017,Avalanche Rescue,466
-1,2018,AIARE 1,2549
-1,2018,AIARE 2,142
-1,2018,Avalanche Rescue,470
-2,2018,AIARE 1,1804
-2,2018,AIARE 2,167
-2,2018,Avalanche Rescue,368
-3,2018,AIARE 1,1110
-3,2018,AIARE 2,145
-3,2018,Avalanche Rescue,265
-4,2018,AIARE 1,200
-4,2018,AIARE 2,12
-4,2018,Avalanche Rescue,80
-5,2018,AIARE 2,6
-6,2018,AIARE 1,6
-6,2018,Avalanche Rescue,18
-7,2018,AIARE 1,27
-7,2018,AIARE 2,3
-7,2018,Avalanche Rescue,12
-8,2018,AIARE 1,70
-8,2018,AIARE 2,13
-8,2018,Avalanche Rescue,52
-9,2018,AIARE 2,4
-11,2018,AIARE 1,197
-11,2018,Avalanche Rescue,20
-12,2018,AIARE 1,1973
-12,2018,AIARE 2,65
-12,2018,Avalanche Rescue,611
-1,2019,AIARE 1,2715
-1,2019,AIARE 2,194
-1,2019,Avalanche Rescue,741
-2,2019,AIARE 1,2016
-2,2019,AIARE 2,119
-2,2019,Avalanche Rescue,370
-3,2019,AIARE 1,1253
-3,2019,AIARE 2,129
-3,2019,Avalanche Rescue,280
-4,2019,AIARE 1,332
-4,2019,AIARE 2,7
-4,2019,Avalanche Rescue,25
-6,2019,Avalanche Rescue,8
-7,2019,AIARE 1,11
-7,2019,AIARE 2,5
-7,2019,Avalanche Rescue,21
-8,2019,AIARE 1,80
-8,2019,AIARE 2,20
-8,2019,Avalanche Rescue,65
-9,2019,AIARE 1,1
-9,2019,AIARE 2,1
-9,2019,Avalanche Rescue,5
-10,2019,AIARE 2,4
-10,2019,Avalanche Rescue,8
-11,2019,AIARE 1,156
-11,2019,Avalanche Rescue,29
-12,2019,AIARE 1,1915
-12,2019,AIARE 2,96
-12,2019,Avalanche Rescue,718
-1,2020,AIARE 1,3530
-1,2020,AIARE 2,295
-1,2020,Avalanche Rescue,841
-2,2020,AIARE 1,2189
-2,2020,AIARE 2,181
-2,2020,Avalanche Rescue,509
-3,2020,AIARE 1,790
-3,2020,AIARE 2,59
-3,2020,Avalanche Rescue,190
-4,2020,AIARE 1,11
-4,2020,Avalanche Rescue,0
-7,2020,AIARE 1,6
-8,2020,AIARE 1,11
-8,2020,Avalanche Rescue,30
-9,2020,AIARE 1,13
-9,2020,Avalanche Rescue,12
-10,2020,AIARE 1,9
-11,2020,AIARE 1,313
-11,2020,AIARE 2,12
-11,2020,Avalanche Rescue,46
-12,2020,AIARE 1,3225
-12,2020,AIARE 1 + Avalanche Rescue,0
-12,2020,AIARE 2,81
-12,2020,Avalanche Rescue,705
-1,2021,AIARE 1,4701
-1,2021,AIARE 2,311
-1,2021,Avalanche Rescue,1072
-2,2021,AIARE 1,3619
-2,2021,AIARE 1 + Avalanche Rescue,11
-2,2021,AIARE 2,309
-2,2021,AIARE 2 + Avalanche Rescue,1
-2,2021,Avalanche Rescue,776
-3,2021,AIARE 1,2317
-3,2021,AIARE 1 + Avalanche Rescue,13
-3,2021,AIARE 2,185
-3,2021,Avalanche Rescue,372
-4,2021,AIARE 1,454
-4,2021,AIARE 1 + Avalanche Rescue,8
-4,2021,AIARE 2,20
-4,2021,Avalanche Rescue,62
-5,2021,Avalanche Rescue,3
-7,2021,AIARE 1,9
-7,2021,Avalanche Rescue,12
-8,2021,AIARE 1,14
-8,2021,Avalanche Rescue,16
-9,2021,AIARE 1 + Avalanche Rescue,9
-11,2021,AIARE 1,89
-11,2021,AIARE 1 + Avalanche Rescue,4
-11,2021,Avalanche Rescue,15
-12,2021,AIARE 1,2226
-12,2021,AIARE 1 + Avalanche Rescue,22
-12,2021,AIARE 2,59
-12,2021,AIARE 2 + Avalanche Rescue,7
-12,2021,Avalanche Rescue,649
-1,2022,AIARE 1,3811
-1,2022,AIARE 1 + Avalanche Rescue,89
-1,2022,AIARE 2,304
-1,2022,AIARE 2 + Avalanche Rescue,9
-1,2022,Avalanche Rescue,923
-2,2022,AIARE 1,2751
-2,2022,AIARE 1 + Avalanche Rescue,61
-2,2022,AIARE 2,319
-2,2022,AIARE 2 + Avalanche Rescue,24
-2,2022,Avalanche Rescue,556
-3,2022,AIARE 1,1719
-3,2022,AIARE 1 + Avalanche Rescue,9
-3,2022,AIARE 2,123
-3,2022,AIARE 2 + Avalanche Rescue,30
-3,2022,Avalanche Rescue,235
-4,2022,AIARE 1,279
-4,2022,AIARE 1 + Avalanche Rescue,6
-4,2022,AIARE 2,28
-4,2022,Avalanche Rescue,38
-6,2022,Avalanche Rescue,1
-7,2022,AIARE 1 + Avalanche Rescue,6
-7,2022,Avalanche Rescue,6
-8,2022,AIARE 1,12
-8,2022,AIARE 1 + Avalanche Rescue,6
-8,2022,AIARE 2,12
-8,2022,Avalanche Rescue,13
-9,2022,Avalanche Rescue,6
-10,2022,AIARE 2,0
-10,2022,Avalanche Rescue,4
-11,2022,AIARE 1,138
-11,2022,AIARE 1 + Avalanche Rescue,9
-11,2022,AIARE 2,5
-11,2022,AIARE 2 + Avalanche Rescue,5
-11,2022,Avalanche Rescue,19
-12,2022,AIARE 1,2236
-12,2022,AIARE 1 + Avalanche Rescue,49
-12,2022,AIARE 2,70
-12,2022,AIARE 2 + Avalanche Rescue,15
-12,2022,Avalanche Rescue,606
-1,2023,AIARE 1,3592
-1,2023,AIARE 1 + Avalanche Rescue,177
-1,2023,AIARE 2,215
-1,2023,AIARE 2 + Avalanche Rescue,10
-1,2023,Avalanche Rescue,1037
-2,2023,AIARE 1,2307
-2,2023,AIARE 1 + Avalanche Rescue,101
-2,2023,AIARE 2,292
-2,2023,AIARE 2 + Avalanche Rescue,13
-2,2023,Avalanche Rescue,417
-3,2023,AIARE 1,1360
-3,2023,AIARE 1 + Avalanche Rescue,23
-3,2023,AIARE 2,136
-3,2023,AIARE 2 + Avalanche Rescue,28
-3,2023,Avalanche Rescue,221
-4,2023,AIARE 1,351
-4,2023,AIARE 1 + Avalanche Rescue,24
-4,2023,AIARE 2,29
-4,2023,Avalanche Rescue,72
-5,2023,AIARE 1,18
-5,2023,Avalanche Rescue,2
-7,2023,Avalanche Rescue,24
-8,2023,AIARE 1 + Avalanche Rescue,0
-8,2023,Avalanche Rescue,32
-9,2023,AIARE 1,5
-11,2023,AIARE 1,73
-11,2023,AIARE 1 + Avalanche Rescue,11
-11,2023,Avalanche Rescue,16
-12,2023,AIARE 1,1611
-12,2023,AIARE 1 + Avalanche Rescue,34
-12,2023,AIARE 2,46
-12,2023,AIARE 2 + Avalanche Rescue,11
-12,2023,Avalanche Rescue,487
-1,2024,AIARE 1,2878
-1,2024,AIARE 1 + Avalanche Rescue,138
-1,2024,AIARE 2,189
-1,2024,AIARE 2 + Avalanche Rescue,29
-1,2024,Avalanche Rescue,733
-2,2024,AIARE 1,1969
-2,2024,AIARE 1 + Avalanche Rescue,92
-2,2024,AIARE 2,234
-2,2024,AIARE 2 + Avalanche Rescue,18
-2,2024,Avalanche Rescue,442
-3,2024,AIARE 1,1180
-3,2024,AIARE 1 + Avalanche Rescue,23
-3,2024,AIARE 2,107
-3,2024,AIARE 2 + Avalanche Rescue,36
-3,2024,Avalanche Rescue,199
-4,2024,AIARE 1,189
-4,2024,AIARE 1 + Avalanche Rescue,40
-4,2024,AIARE 2,28
-4,2024,AIARE 2 + Avalanche Rescue,6
-4,2024,Avalanche Rescue,43
-6,2024,Avalanche Rescue,6
-7,2024,AIARE 1,6
-7,2024,Avalanche Rescue,7
-8,2024,AIARE 1,6
-8,2024,AIARE 1 + Avalanche Rescue,7
-8,2024,Avalanche Rescue,6
-11,2024,AIARE 1,32
-11,2024,AIARE 1 + Avalanche Rescue,7
-11,2024,Avalanche Rescue,14
-12,2024,AIARE 1,1339
-12,2024,AIARE 1 + Avalanche Rescue,53
-12,2024,AIARE 2,56
-12,2024,AIARE 2 + Avalanche Rescue,6
-12,2024,Avalanche Rescue,453
-1,2025,AIARE 1,2796
-1,2025,AIARE 1 + Avalanche Rescue,184
-1,2025,AIARE 2,223
-1,2025,AIARE 2 + Avalanche Rescue,34
-1,2025,Avalanche Rescue,662
-2,2025,AIARE 1,1716
-2,2025,AIARE 1 + Avalanche Rescue,144
-2,2025,AIARE 2,169
-2,2025,AIARE 2 + Avalanche Rescue,21
-2,2025,Avalanche Rescue,370
-3,2025,AIARE 1,976
-3,2025,AIARE 1 + Avalanche Rescue,17
-3,2025,AIARE 2,114
-3,2025,AIARE 2 + Avalanche Rescue,18
-3,2025,Avalanche Rescue,182
-4,2025,AIARE 1,117
-4,2025,AIARE 1 + Avalanche Rescue,30
-4,2025,AIARE 2,23
-4,2025,AIARE 2 + Avalanche Rescue,6
-4,2025,Avalanche Rescue,12
-5,2025,AIARE 1,11
-5,2025,Avalanche Rescue,2
-8,2025,AIARE 1,22
-8,2025,AIARE 2,3
-8,2025,Avalanche Rescue,2
-10,2025,AIARE 1,0
-11,2025,AIARE 1,0
-11,2025,AIARE 1 + Avalanche Rescue,0
-11,2025,Avalanche Rescue,0
-12,2025,AIARE 1,737
-12,2025,AIARE 1 + Avalanche Rescue,41
-12,2025,AIARE 2,22
-12,2025,AIARE 2 + Avalanche Rescue,0
-12,2025,Avalanche Rescue,244
-1,2026,AIARE 1,2555
-1,2026,AIARE 1 + Avalanche Rescue,198
-1,2026,AIARE 2,144
-1,2026,AIARE 2 + Avalanche Rescue,15
-1,2026,Avalanche Rescue,724
-2,2026,AIARE 1,1205
-2,2026,AIARE 1 + Avalanche Rescue,113
-2,2026,AIARE 2,145
-2,2026,AIARE 2 + Avalanche Rescue,7
-2,2026,Avalanche Rescue,278
-3,2026,AIARE 1,326
-3,2026,AIARE 1 + Avalanche Rescue,14
-3,2026,AIARE 2,55
-3,2026,AIARE 2 + Avalanche Rescue,1
-3,2026,Avalanche Rescue,78
-4,2026,AIARE 1,0
-4,2026,AIARE 1 + Avalanche Rescue,0
-4,2026,AIARE 2,0
-4,2026,Avalanche Rescue,0
-5,2026,AIARE 1,0
+month,year,combined_course,enrolled,student_price,course
+7,2017,aiare 1,30,391.6666666666667,AIARE 1
+7,2017,aiare 2,12,197.5,AIARE 2
+7,2017,avalanche rescue,29,107.5,Avalanche Rescue
+8,2017,aiare 1,63,370.8333333333333,AIARE 1
+8,2017,aiare 2,15,533.3333333333334,AIARE 2
+8,2017,avalanche rescue,5,140.0,Avalanche Rescue
+9,2017,aiare 2,11,195.5,AIARE 2
+9,2017,avalanche rescue,8,145.0,Avalanche Rescue
+11,2017,aiare 1,95,389.75,AIARE 1
+11,2017,avalanche rescue,34,84.16666666666667,Avalanche Rescue
+12,2017,aiare 1,1768,368.08053691275165,AIARE 1
+12,2017,aiare 2,47,352.85714285714283,AIARE 2
+12,2017,avalanche rescue,466,140.625,Avalanche Rescue
+1,2018,aiare 1,2549,351.1004566210046,AIARE 1
+1,2018,aiare 2,142,409.27272727272725,AIARE 2
+1,2018,avalanche rescue,470,130.52238805970148,Avalanche Rescue
+2,2018,aiare 1,1804,355.48333333333335,AIARE 1
+2,2018,aiare 2,167,430.41379310344826,AIARE 2
+2,2018,avalanche rescue,368,131.32835820895522,Avalanche Rescue
+3,2018,aiare 1,1110,342.8376068376068,AIARE 1
+3,2018,aiare 2,145,443.7391304347826,AIARE 2
+3,2018,avalanche rescue,265,108.7948717948718,Avalanche Rescue
+4,2018,aiare 1,200,43908.260869565216,AIARE 1
+4,2018,aiare 2,12,400.0,AIARE 2
+4,2018,avalanche rescue,80,212.91666666666666,Avalanche Rescue
+5,2018,aiare 2,6,350.0,AIARE 2
+6,2018,aiare 1,6,460.0,AIARE 1
+6,2018,avalanche rescue,18,143.33333333333334,Avalanche Rescue
+7,2018,aiare 1,27,446.0,AIARE 1
+7,2018,aiare 2,3,460.0,AIARE 2
+7,2018,avalanche rescue,12,140.0,Avalanche Rescue
+8,2018,aiare 1,70,321.25,AIARE 1
+8,2018,aiare 2,13,480.0,AIARE 2
+8,2018,avalanche rescue,52,110.0,Avalanche Rescue
+9,2018,aiare 2,4,0.0,AIARE 2
+11,2018,aiare 1,197,416.3076923076923,AIARE 1
+11,2018,avalanche rescue,20,133.75,Avalanche Rescue
+12,2018,aiare 1,1973,11177.71511627907,AIARE 1
+12,2018,aiare 2,65,39014.90909090909,AIARE 2
+12,2018,avalanche rescue,611,155.26136363636363,Avalanche Rescue
+1,2019,aiare 1,2715,2115.8204081632653,AIARE 1
+1,2019,aiare 2,194,436.3636363636364,AIARE 2
+1,2019,avalanche rescue,741,145.64356435643563,Avalanche Rescue
+2,2019,aiare 1,2016,7922.185185185185,AIARE 1
+2,2019,aiare 2,119,423.6521739130435,AIARE 2
+2,2019,avalanche rescue,370,148.203125,Avalanche Rescue
+3,2019,aiare 1,1253,4004.2916666666665,AIARE 1
+3,2019,aiare 2,129,538.0,AIARE 2
+3,2019,avalanche rescue,280,221.77358490566039,Avalanche Rescue
+4,2019,aiare 1,332,396.1333333333333,AIARE 1
+4,2019,aiare 2,7,416.3333333333333,AIARE 2
+4,2019,avalanche rescue,25,199.2,Avalanche Rescue
+6,2019,avalanche rescue,8,90000.0,Avalanche Rescue
+7,2019,aiare 1,11,142.5,AIARE 1
+7,2019,aiare 2,5,0.0,AIARE 2
+7,2019,avalanche rescue,21,30000.0,Avalanche Rescue
+8,2019,aiare 1,80,28807.0,AIARE 1
+8,2019,aiare 2,20,292.5,AIARE 2
+8,2019,avalanche rescue,65,8270.90909090909,Avalanche Rescue
+9,2019,aiare 1,1,0.0,AIARE 1
+9,2019,aiare 2,1,0.0,AIARE 2
+9,2019,avalanche rescue,5,75.0,Avalanche Rescue
+10,2019,aiare 2,4,430.0,AIARE 2
+10,2019,avalanche rescue,8,130.0,Avalanche Rescue
+11,2019,aiare 1,156,468.2307692307692,AIARE 1
+11,2019,avalanche rescue,29,132.5,Avalanche Rescue
+12,2019,aiare 1,1915,434.83815028901734,AIARE 1
+12,2019,aiare 2,96,472.5,AIARE 2
+12,2019,avalanche rescue,718,165.70454545454547,Avalanche Rescue
+1,2020,aiare 1,3530,431.468438538206,AIARE 1
+1,2020,aiare 2,295,459.625,AIARE 2
+1,2020,avalanche rescue,841,153.5486725663717,Avalanche Rescue
+2,2020,aiare 1,2189,406.8173076923077,AIARE 1
+2,2020,aiare 2,181,455.2857142857143,AIARE 2
+2,2020,avalanche rescue,509,2020.857142857143,Avalanche Rescue
+3,2020,aiare 1,790,446.3421052631579,AIARE 1
+3,2020,aiare 2,59,480.0,AIARE 2
+3,2020,avalanche rescue,190,151.03333333333333,Avalanche Rescue
+4,2020,aiare 1,11,450.0,AIARE 1
+4,2020,avalanche rescue,0,175.0,Avalanche Rescue
+7,2020,aiare 1,6,0.0,AIARE 1
+8,2020,aiare 1,11,0.0,AIARE 1
+8,2020,avalanche rescue,30,67500.0,Avalanche Rescue
+9,2020,aiare 1,13,147500.0,AIARE 1
+9,2020,avalanche rescue,12,45000.0,Avalanche Rescue
+10,2020,aiare 1,9,295000.0,AIARE 1
+11,2020,aiare 1,313,401.22727272727275,AIARE 1
+11,2020,aiare 2,12,287.5,AIARE 2
+11,2020,avalanche rescue,46,199.8,Avalanche Rescue
+12,2020,aiare 1,3225,10376.603112840467,AIARE 1
+12,2020,aiare 2,81,510.4,AIARE 2
+12,2020,avalanche rescue,705,4347.648148148148,Avalanche Rescue
+1,2021,aiare 1,4701,13177.706467661692,AIARE 1
+1,2021,aiare 2,311,20663.04761904762,AIARE 2
+1,2021,avalanche rescue,1072,9848.68,Avalanche Rescue
+2,2021,aiare 1,3630,6872.344051446946,AIARE 1
+2,2021,aiare 2,310,447.7826086956522,AIARE 2
+2,2021,avalanche rescue,776,166.1925925925926,Avalanche Rescue
+3,2021,aiare 1,2330,448.2897196261682,AIARE 1
+3,2021,aiare 2,185,488.5483870967742,AIARE 2
+3,2021,avalanche rescue,372,191.66402597402598,Avalanche Rescue
+4,2021,aiare 1,462,506.29411764705884,AIARE 1
+4,2021,aiare 2,20,783.6666666666666,AIARE 2
+4,2021,avalanche rescue,62,221.23529411764707,Avalanche Rescue
+5,2021,avalanche rescue,3,175.0,Avalanche Rescue
+7,2021,aiare 1,9,295000.0,AIARE 1
+7,2021,avalanche rescue,12,95000.0,Avalanche Rescue
+8,2021,aiare 1,14,295000.0,AIARE 1
+8,2021,avalanche rescue,16,71312.25,Avalanche Rescue
+9,2021,aiare 1,9,250.0,AIARE 1 + Avalanche Rescue
+11,2021,aiare 1,93,595.5555555555555,AIARE 1
+11,2021,avalanche rescue,15,213.0,Avalanche Rescue
+12,2021,aiare 1,2248,531.6245173745174,AIARE 1
+12,2021,aiare 2,66,578.3333333333334,AIARE 2
+12,2021,avalanche rescue,649,203.98104,Avalanche Rescue
+1,2022,aiare 1,3900,517.1099251870323,AIARE 1
+1,2022,aiare 2,313,597.5307547169812,AIARE 2
+1,2022,avalanche rescue,923,201.8638961038961,Avalanche Rescue
+2,2022,aiare 1,2812,526.325868852459,AIARE 1
+2,2022,aiare 2,343,546.6929824561404,AIARE 2
+2,2022,avalanche rescue,556,207.00840336134453,Avalanche Rescue
+3,2022,aiare 1,1728,532.027149321267,AIARE 1
+3,2022,aiare 2,153,544.3566666666667,AIARE 2
+3,2022,avalanche rescue,235,210.6875,Avalanche Rescue
+4,2022,aiare 1,285,567.9130434782609,AIARE 1
+4,2022,aiare 2,28,635.5,AIARE 2
+4,2022,avalanche rescue,38,233.65,Avalanche Rescue
+6,2022,avalanche rescue,1,195.0,Avalanche Rescue
+7,2022,aiare 1,6,290.0,AIARE 1 + Avalanche Rescue
+7,2022,avalanche rescue,6,95000.0,Avalanche Rescue
+8,2022,aiare 1,18,147675.0,AIARE 1
+8,2022,aiare 2,12,147675.0,AIARE 2
+8,2022,avalanche rescue,13,95000.0,Avalanche Rescue
+9,2022,avalanche rescue,6,95000.0,Avalanche Rescue
+10,2022,aiare 2,0,595.0,AIARE 2
+10,2022,avalanche rescue,4,95000.0,Avalanche Rescue
+11,2022,aiare 1,147,651.7647058823529,AIARE 1
+11,2022,aiare 2,10,767.5,AIARE 2
+11,2022,avalanche rescue,19,219.83333333333334,Avalanche Rescue
+12,2022,aiare 1,2285,609.1768060836501,AIARE 1
+12,2022,aiare 2,85,681.0555555555555,AIARE 2
+12,2022,avalanche rescue,606,236.52032520325204,Avalanche Rescue
+1,2023,aiare 1,3769,580.7434663341646,AIARE 1 + Avalanche Rescue
+1,2023,aiare 2,225,592.6818181818181,AIARE 2
+1,2023,avalanche rescue,1037,217.2712765957447,Avalanche Rescue
+2,2023,aiare 1,2408,587.1269841269841,AIARE 1 + Avalanche Rescue
+2,2023,aiare 2,305,637.8039215686274,AIARE 2
+2,2023,avalanche rescue,417,232.24130000000002,Avalanche Rescue
+3,2023,aiare 1,1383,601.6869339622642,AIARE 1 + Avalanche Rescue
+3,2023,aiare 2,164,656.675,AIARE 2
+3,2023,avalanche rescue,221,227.83870967741936,Avalanche Rescue
+4,2023,aiare 1,375,627.6949152542373,AIARE 1
+4,2023,aiare 2,29,694.5,AIARE 2
+4,2023,avalanche rescue,72,207.34782608695653,Avalanche Rescue
+5,2023,aiare 1,18,610.0,AIARE 1
+5,2023,avalanche rescue,2,280.0,Avalanche Rescue
+7,2023,avalanche rescue,24,110000.0,Avalanche Rescue
+8,2023,aiare 1,0,500000.0,AIARE 1 + Avalanche Rescue
+8,2023,avalanche rescue,32,110000.0,Avalanche Rescue
+9,2023,aiare 1,5,310000.0,AIARE 1
+11,2023,aiare 1,84,654.8888888888889,AIARE 1
+11,2023,avalanche rescue,16,262.0,Avalanche Rescue
+12,2023,aiare 1,1645,617.1939655172414,AIARE 1
+12,2023,aiare 2,57,698.8,AIARE 2
+12,2023,avalanche rescue,487,230.0326851851852,Avalanche Rescue
+1,2024,aiare 1,3016,602.0459116022099,AIARE 1
+1,2024,aiare 2,218,719.88,AIARE 2
+1,2024,avalanche rescue,733,236.93925675675678,Avalanche Rescue
+2,2024,aiare 1,2061,607.2253521126761,AIARE 1
+2,2024,aiare 2,252,713.4081632653061,AIARE 2
+2,2024,avalanche rescue,442,238.89078260869564,Avalanche Rescue
+3,2024,aiare 1,1203,596.9481603773585,AIARE 1
+3,2024,aiare 2,143,669.2944117647058,AIARE 2
+3,2024,avalanche rescue,199,237.52323076923076,Avalanche Rescue
+4,2024,aiare 1,229,663.1222448979593,AIARE 1 + Avalanche Rescue
+4,2024,aiare 2,34,553.7,AIARE 2
+4,2024,avalanche rescue,43,224.0,Avalanche Rescue
+6,2024,avalanche rescue,6,110000.0,Avalanche Rescue
+7,2024,aiare 1,6,350000.0,AIARE 1
+7,2024,avalanche rescue,7,130000.0,Avalanche Rescue
+8,2024,aiare 1,13,425000.0,AIARE 1
+8,2024,avalanche rescue,6,110000.0,Avalanche Rescue
+11,2024,aiare 1,39,712.9333333333333,AIARE 1
+11,2024,avalanche rescue,14,287.85714285714283,Avalanche Rescue
+12,2024,aiare 1,1392,624.974358974359,AIARE 1
+12,2024,aiare 2,62,741.45,AIARE 2
+12,2024,avalanche rescue,453,244.1015625,Avalanche Rescue
+1,2025,aiare 1,2980,656.446865284974,AIARE 1 + Avalanche Rescue
+1,2025,aiare 2,257,749.9375,AIARE 2
+1,2025,avalanche rescue,662,235.29144385026737,Avalanche Rescue
+2,2025,aiare 1,1860,635.5816887417219,AIARE 1 + Avalanche Rescue
+2,2025,aiare 2,190,735.7352941176471,AIARE 2
+2,2025,avalanche rescue,370,243.99285714285713,Avalanche Rescue
+3,2025,aiare 1,993,627.1193532338309,AIARE 1
+3,2025,aiare 2,132,717.9305555555555,AIARE 2
+3,2025,avalanche rescue,182,262.43888888888887,Avalanche Rescue
+4,2025,aiare 1,147,647.8152173913044,AIARE 1
+4,2025,aiare 2,29,994.4,AIARE 2 + Avalanche Rescue
+4,2025,avalanche rescue,12,260.3,Avalanche Rescue
+5,2025,aiare 1,11,600.0,AIARE 1
+5,2025,avalanche rescue,2,0.0,Avalanche Rescue
+8,2025,aiare 1,22,422.25,AIARE 1
+8,2025,aiare 2,3,0.0,AIARE 2
+8,2025,avalanche rescue,2,0.0,Avalanche Rescue
+10,2025,aiare 1,0,695.0,AIARE 1
+11,2025,aiare 1,0,684.6666666666666,AIARE 1
+11,2025,avalanche rescue,0,237.6,Avalanche Rescue
+12,2025,aiare 1,778,655.0111814345992,AIARE 1
+12,2025,aiare 2,22,867.6315789473684,AIARE 2
+12,2025,avalanche rescue,244,258.7284482758621,Avalanche Rescue
+1,2026,aiare 1,2764,641.8437825059101,AIARE 1
+1,2026,aiare 2,159,701.5686274509804,AIARE 2
+1,2026,avalanche rescue,724,252.53166666666667,Avalanche Rescue
+2,2026,aiare 1,1380,640.7428758169934,AIARE 1
+2,2026,aiare 2,165,739.0267857142857,AIARE 2
+2,2026,avalanche rescue,289,262.7967479674797,Avalanche Rescue
+3,2026,aiare 1,526,643.5022277227723,AIARE 1
+3,2026,aiare 2,60,868.3061290322581,AIARE 2
+3,2026,avalanche rescue,125,262.25625,Avalanche Rescue
+4,2026,aiare 1,0,684.0,AIARE 1 + Avalanche Rescue
+4,2026,aiare 2,0,1225.0,AIARE 2
+4,2026,avalanche rescue,0,272.625,Avalanche Rescue
+5,2026,aiare 1,0,600.0,AIARE 1

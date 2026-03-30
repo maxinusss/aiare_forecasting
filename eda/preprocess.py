@@ -191,6 +191,7 @@ def combine_student_counts(folder_path: str, output_path: str) -> pd.DataFrame:
         )
         .reset_index(drop=True)
     )
+    result['num_students'] = result['num_students'].astype(int)
 
     # Create output directory if it doesn't exist
     output_file = Path(output_path)
@@ -267,14 +268,14 @@ def get_us_course_price_no_outliers(course_location_df: pd.DataFrame, output_pat
     # Compute 10th/90th percentile bounds within each combined_course group
     quantile_bounds = (
         course_location_df.groupby("combined_course")["student_price"]
-        .quantile([0.10, 0.90])
+        .quantile([0.05, 0.95])
         .unstack(level=-1)
-        .rename(columns={0.10: "q10", 0.90: "q90"})
+        .rename(columns={0.05: "q05", 0.95: "q95"})
     )
 
     # Join bounds back to course_df
     course_location_df = course_location_df.merge(
-        quantile_bounds[["q10", "q90"]],
+        quantile_bounds[["q05", "q95"]],
         left_on="combined_course",
         right_index=True,
         how="left"
@@ -282,8 +283,8 @@ def get_us_course_price_no_outliers(course_location_df: pd.DataFrame, output_pat
 
     # Filter outliers using group-specific 10/90 bounds
     cleaned = course_location_df[
-        (course_location_df["student_price"] >= course_location_df["q10"]) &
-        (course_location_df["student_price"] <= course_location_df["q90"]) 
+        (course_location_df["student_price"] >= course_location_df["q05"]) &
+        (course_location_df["student_price"] <= course_location_df["q95"]) 
         ].copy()
 
     final = (
@@ -293,6 +294,7 @@ def get_us_course_price_no_outliers(course_location_df: pd.DataFrame, output_pat
         .rename(columns={'student_price': 'mean_student_price'})
         .sort_values(['year', 'month', 'combined_course'])
     )
+    final['mean_student_price'] = final['mean_student_price'].round(2)
     final.to_csv(output_path, index=False)
     return final
 
@@ -309,6 +311,6 @@ course_location = combine_course_by_location_price(
 course_prices = get_us_course_price_no_outliers(
     course_location, "data/cleaned_data/course_price_us.csv")
 
-master_data = merge_dataframes_on_keys(dfs=[courses, students, course_prices], keys=["month", "year", "combined_course"])
+master_data = merge_dataframes_on_keys(dfs=[courses.drop('student_price', axis =1), students, course_prices], keys=["month", "year", "combined_course"])
 master_data = master_data[master_data["year"] >= 2017].copy()  # filter to 2017
 master_data.to_csv("data/cleaned_data/master_data.csv", index=False)

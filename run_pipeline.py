@@ -84,12 +84,20 @@ def main():
         f"conda run -n {env_name} python eda/preprocess.py",
         check=True
     )
-    
+
+    # Run figure generation after preprocessing
+    run_command(
+        f"conda run -n {env_name} python eda/create_figs.py",
+        check=True
+    )
+
     print("\n" + "=" * 50)
     print("✅ Pipeline completed successfully!")
     print("Output files:")
     print("  - data/cleaned_data/course_enrollment.csv")
     print("  - data/cleaned_data/student_counts.csv")
+    print("  - data/cleaned_data/master_data.csv")
+    print("  - plot files (e.g., price_trends.png, enrollment_trends.png)")
     print("=" * 50)
 
 

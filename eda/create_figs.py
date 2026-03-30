@@ -11,7 +11,7 @@ os.chdir(Path(__file__).parent.parent)
 
 df = pd.read_csv(r"data/cleaned_data/master_data.csv")
 
-grouped = df.groupby(["year", "combined_course"], as_index=False).agg({'enrolled': 'sum', 'mean_student_price': 'mean'})
+grouped = df.groupby(["year", "combined_course"], as_index=False).agg({'num_students': 'sum', 'mean_student_price': 'mean'})
 sns.lineplot(
     data=grouped,
     x="year",
@@ -25,7 +25,7 @@ plt.close()
 sns.lineplot(
     data=grouped,
     x="year",
-    y="enrolled",   # or use enrollment-based column from master
+    y="num_students",   # or use enrollment-based column from master
     hue="combined_course",
     marker="o",
 )

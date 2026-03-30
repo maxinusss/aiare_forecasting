@@ -7,7 +7,7 @@ from utils import merge_dataframes_on_keys
 os.chdir(Path(__file__).parent.parent)
 
 # Date filter: only include data after this date
-FILTER_DATE = pd.Timestamp("2017-07-01")
+# FILTER_DATE = pd.Timestamp("2017-07-01")
 
 
 def combine_course_enrollment(folder_path: str, output_path: str) -> pd.DataFrame:
@@ -57,7 +57,7 @@ def combine_course_enrollment(folder_path: str, output_path: str) -> pd.DataFram
         temp = temp.dropna(subset=["Start Date", "Course Type Name"])
         
         # Filter to dates after FILTER_DATE
-        temp = temp[temp["Start Date"] > FILTER_DATE]
+        # temp = temp[temp["Start Date"] > FILTER_DATE]
 
         temp["month"] = temp["Start Date"].dt.month
         temp["year"] = temp["Start Date"].dt.year
@@ -120,8 +120,6 @@ def combine_student_counts(folder_path: str, output_path: str) -> pd.DataFrame:
     required_cols = {
         "ID",
         "Course Type Name",
-        "Course State",
-        "Course Mode of Travel",
         "Course Start Date",
     }
 
@@ -138,8 +136,6 @@ def combine_student_counts(folder_path: str, output_path: str) -> pd.DataFrame:
             [
                 "ID",
                 "Course Type Name",
-                "Course State",
-                "Course Mode of Travel",
                 "Course Start Date",
             ]
         ].copy()
@@ -151,13 +147,11 @@ def combine_student_counts(folder_path: str, output_path: str) -> pd.DataFrame:
         temp = temp.dropna(subset=["Course Start Date", "Course Type Name", "ID"])
         
         # Filter to dates after FILTER_DATE
-        temp = temp[temp["Course Start Date"] > FILTER_DATE]
+        # temp = temp[temp["Course Start Date"] > FILTER_DATE]
 
         temp["month"] = temp["Course Start Date"].dt.month
         temp["year"] = temp["Course Start Date"].dt.year
         temp["course"] = temp["Course Type Name"]
-        temp["state"] = temp["Course State"]
-        temp["course_mode_of_travel"] = temp["Course Mode of Travel"]
 
         # Create combined_course while keeping raw course text
         temp["combined_course"] = temp["course"].str.strip().str.lower()
@@ -172,8 +166,6 @@ def combine_student_counts(folder_path: str, output_path: str) -> pd.DataFrame:
                     "year",
                     "course",
                     "combined_course",
-                    "state",
-                    "course_mode_of_travel",
                     "ID",
                 ]
             ]
@@ -192,7 +184,7 @@ def combine_student_counts(folder_path: str, output_path: str) -> pd.DataFrame:
         combined.groupby(
             ["month", "year", "combined_course"],
             as_index=False,
-        ).agg({"ID":"count", "course":"first"})
+        ).agg({"ID":"count"})
         .rename(columns={"ID": "num_students"})
         .sort_values(
             ["year", "month", "combined_course"]
@@ -226,7 +218,7 @@ def combine_course_by_location_price(folder_path: str, output_path: str) -> pd.D
         temp = df[["Course Type Name", "Start Date", "Enrolled", "Student Price", "Location"]].copy()
         temp["Start Date"] = pd.to_datetime(temp["Start Date"], errors="coerce")
         temp = temp.dropna(subset=["Start Date", "Course Type Name", "Location"])
-        temp = temp[temp["Start Date"] > FILTER_DATE]
+        # temp = temp[temp["Start Date"] > FILTER_DATE
 
         temp["year"] = temp["Start Date"].dt.year
         temp["month"] = temp["Start Date"].dt.month
@@ -318,4 +310,5 @@ course_prices = get_us_course_price_no_outliers(
     course_location, "data/cleaned_data/course_price_us.csv")
 
 master_data = merge_dataframes_on_keys(dfs=[courses, students, course_prices], keys=["month", "year", "combined_course"])
+master_data = master_data[master_data["year"] >= 2017].copy()  # filter to 2017
 master_data.to_csv("data/cleaned_data/master_data.csv", index=False)

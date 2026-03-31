@@ -9,6 +9,7 @@ dependencies:
   - numpy
   - matplotlib
   - seaborn
+  - sklearn
   - pip
 
   # Optional but useful for working with CSVs and dates

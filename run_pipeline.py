@@ -81,13 +81,34 @@ def main():
     print("=" * 50)
     
     run_command(
-        f"conda run -n {env_name} python eda/preprocess.py",
+        f"conda run -n {env_name} python preprocessing/preprocess_raw_data.py",
+        check=True
+    )
+
+    # Run El Niño/La Niña scraping
+    print("\n🌊 Fetching el_nino/la_nina outlooks...")
+    run_command(
+        f"conda run -n {env_name} python preprocessing/el_nino_la_nina_scraping.py",
+        check=True
+    )
+
+    # Run economic data ingestion
+    print("\n💹 Pulling economic trends from FRED...")
+    run_command(
+        f"conda run -n {env_name} python preprocessing/pull_economic_data.py",
+        check=True
+    )
+
+    # Run merge into master with el_nino data
+    print("\n🧩 Merging master with El Niño/La Niña data...")
+    run_command(
+        f"conda run -n {env_name} python preprocessing/combine_for_master.py",
         check=True
     )
 
     # Run figure generation after preprocessing
     run_command(
-        f"conda run -n {env_name} python eda/create_figs.py",
+        f"conda run -n {env_name} python preprocessing/create_figs.py",
         check=True
     )
 

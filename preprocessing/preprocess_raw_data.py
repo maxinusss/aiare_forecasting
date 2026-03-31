@@ -313,4 +313,5 @@ course_prices = get_us_course_price_no_outliers(
 
 master_data = merge_dataframes_on_keys(dfs=[courses.drop('student_price', axis =1), students, course_prices], keys=["month", "year", "combined_course"])
 master_data = master_data[master_data["year"] >= 2017].copy()  # filter to 2017
+master_data.sort_values(['combined_course', 'year', 'month'], inplace=True)
 master_data.to_csv("data/cleaned_data/master_data.csv", index=False)

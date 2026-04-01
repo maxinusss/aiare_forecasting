@@ -15,13 +15,18 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from itertools import product
+from sklearn.base import clone
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import Ridge, ElasticNet
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, HistGradientBoostingRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
-from sklearn.ensemble import HistGradientBoostingRegressor
+from sklearn.base import clone
+from sklearn.inspection import permutation_importance
+import matplotlib.pyplot as plt
 
 
 logging.basicConfig(
@@ -39,6 +44,7 @@ TARGET_COL = "num_students"   # change to "enrolled" if desired
 
 FORECAST_HORIZON_MONTHS = 12
 FORECAST_END_DATE = pd.Timestamp("2027-07-31")
+HYPERPARAMETER_TUNING = True
 
 # Keep this light
 LAGS = [1, 2, 3, 12]
@@ -47,26 +53,38 @@ ROLL_WINDOWS = [3, 12]
 MIN_TRAIN_MONTHS = 24
 VALID_MONTHS = 3
 
-# Lightweight model list
+# Base models to evaluate
 MODEL_SPECS = {
-    "ridge_small": Ridge(alpha=1.0),
-    "ridge_medium": Ridge(alpha=10.0),
-    "elasticnet_small": ElasticNet(alpha=0.05, l1_ratio=0.2, max_iter=10000, random_state=42),
-    "elasticnet_medium": ElasticNet(alpha=0.1, l1_ratio=0.5, max_iter=10000, random_state=42),
-    "hgb_small": HistGradientBoostingRegressor(
-        max_depth=3,
-        learning_rate=0.05,
-        max_iter=100,
-        min_samples_leaf=5,
-        random_state=42,
-    ),
-    "hgb_medium": HistGradientBoostingRegressor(
-        max_depth=4,
-        learning_rate=0.05,
-        max_iter=150,
-        min_samples_leaf=5,
-        random_state=42,
-    ),
+    "ridge": Ridge(),
+    "elasticnet": ElasticNet(max_iter=10000, random_state=42),
+    "random_forest": RandomForestRegressor(random_state=42, n_jobs=-1),
+    "gbr": GradientBoostingRegressor(random_state=42),
+    "hgb": HistGradientBoostingRegressor(random_state=42),
+}
+
+# Candidate hyperparameter grids (for manual search with our CV split style)
+MODEL_PARAM_GRID = {
+    "ridge": {
+        "model__alpha": [0.1, 1.0, 10.0, 100.0],
+    },
+    "elasticnet": {
+        "model__alpha": [0.01, 0.05, 0.1, 0.5],
+        "model__l1_ratio": [0.1, 0.3, 0.5, 0.7, 0.9],
+    },
+    "random_forest": {
+        "model__n_estimators": [50, 100, 200],
+        "model__max_depth": [None, 5, 10, 20],
+    },
+    "gbr": {
+        "model__n_estimators": [100, 200, 300],
+        "model__learning_rate": [0.01, 0.05, 0.1],
+        "model__max_depth": [3, 4, 6],
+    },
+    "hgb": {
+        "model__max_iter": [100, 200, 400],
+        "model__learning_rate": [0.01, 0.05, 0.1],
+        "model__max_depth": [3, 4, 6],
+    },
 }
 
 
@@ -98,6 +116,14 @@ def add_time_features(df: pd.DataFrame) -> pd.DataFrame:
 
     out["month_sin"] = np.sin(2 * np.pi * out["month_num"] / 12)
     out["month_cos"] = np.cos(2 * np.pi * out["month_num"] / 12)
+    out["quarter_sin"] = np.sin(2 * np.pi * out["quarter"] / 4)
+    out["quarter_cos"] = np.cos(2 * np.pi * out["quarter"] / 4)
+
+    # Seasonal indicator columns for month vs year cycle
+    out["is_winter"] = out["month_num"].isin([12, 1, 2]).astype(int)
+    out["is_spring"] = out["month_num"].isin([3, 4, 5]).astype(int)
+    out["is_summer"] = out["month_num"].isin([6, 7, 8]).astype(int)
+    out["is_fall"] = out["month_num"].isin([9, 10, 11]).astype(int)
 
     logging.info(
         "Added time features | rows=%s | min_date=%s | max_date=%s",
@@ -118,9 +144,14 @@ def add_lag_features(df: pd.DataFrame, target_col: str) -> pd.DataFrame:
     for window in ROLL_WINDOWS:
         out[f"{target_col}_roll_mean_{window}"] = out[target_col].shift(1).rolling(window).mean()
 
-    lag_cols = [c for c in out.columns if "_lag_" in c or "_roll_" in c]
+    # Seasonal seasonality features
+    out[f"{target_col}_lag_12"] = out[target_col].shift(12)
+    out[f"{target_col}_seasonal_diff"] = out[target_col] - out[target_col].shift(12)
+    out[f"{target_col}_roll_mean_12"] = out[target_col].shift(1).rolling(12).mean()
+
+    lag_cols = [c for c in out.columns if "_lag_" in c or "_roll_" in c or "_seasonal_diff" in c]
     logging.info(
-        "Added lag/rolling features | target=%s | lag_feature_count=%s",
+        "Added lag/rolling/seasonal features | target=%s | lag_feature_count=%s",
         target_col,
         len(lag_cols),
     )
@@ -388,45 +419,95 @@ def train_best_model_for_course(course_df: pd.DataFrame, target_col: str):
     for model_name, model in MODEL_SPECS.items():
         logging.info("Testing model | course=%s | model=%s", course_name, model_name)
 
-        pipeline = Pipeline(
-            steps=[
-                ("preprocessor", preprocessor),
-                ("model", model),
-            ]
-        )
+        param_grid = MODEL_PARAM_GRID.get(model_name, {})
+        if not param_grid:
+            param_grid = {}
 
-        metrics = evaluate_model(
-            X=X,
-            y=y,
-            pipeline=pipeline,
-            splits=splits,
-            course_name=course_name,
-            model_name=model_name,
-        )
+        # Build candidate parameter sets
+        if HYPERPARAMETER_TUNING and param_grid:
+            keys = list(param_grid.keys())
+            values_product = list(product(*param_grid.values()))
+            candidates = [dict(zip(keys, v)) for v in values_product]
+        else:
+            candidates = [{}]
 
-        results.append(
-            {
-                "course": course_name,
-                "model_name": model_name,
-                "rmse_mean": metrics["rmse_mean"],
-                "mae_mean": metrics["mae_mean"],
-                "mape_mean": metrics["mape_mean"],
-            }
-        )
+        for candidate_params in candidates:
+            candidate_model = clone(model).set_params(**{k.replace('model__', ''): v for k, v in candidate_params.items()})
 
-        if best_rmse is None or metrics["rmse_mean"] < best_rmse:
-            best_rmse = metrics["rmse_mean"]
-            best_name = model_name
-            best_pipeline = pipeline
-            logging.info(
-                "New best model found | course=%s | model=%s | rmse=%.4f",
-                course_name,
-                best_name,
-                best_rmse,
+            pipeline = Pipeline(
+                steps=[
+                    ("preprocessor", preprocessor),
+                    ("model", candidate_model),
+                ]
             )
+
+            candidate_label = model_name
+            if candidate_params:
+                candidate_label = f"{model_name}_" + "_".join([f"{k.split('__')[-1]}={v}" for k, v in candidate_params.items()])
+
+            metrics = evaluate_model(
+                X=X,
+                y=y,
+                pipeline=pipeline,
+                splits=splits,
+                course_name=course_name,
+                model_name=candidate_label,
+            )
+
+            results.append(
+                {
+                    "course": course_name,
+                    "model_name": candidate_label,
+                    "rmse_mean": metrics["rmse_mean"],
+                    "mae_mean": metrics["mae_mean"],
+                    "mape_mean": metrics["mape_mean"],
+                }
+            )
+
+            if best_rmse is None or metrics["rmse_mean"] < best_rmse:
+                best_rmse = metrics["rmse_mean"]
+                best_name = candidate_label
+                best_pipeline = pipeline
+                logging.info(
+                    "New best model found | course=%s | model=%s | rmse=%.4f",
+                    course_name,
+                    best_name,
+                    best_rmse,
+                )
+
+    if best_pipeline is None:
+        logging.error("No model could be selected for course=%s. Skipping.", course_name)
+        return None
 
     logging.info("Refitting best model on full course history | course=%s | model=%s", course_name, best_name)
     best_pipeline.fit(X, y)
+
+    # Feature importance analysis
+    feature_dir = Path("forecast/forecast_metrics")
+    feature_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        importance = permutation_importance(best_pipeline, X, y, n_repeats=10, random_state=42, n_jobs=-1)
+        feature_importance_df = (
+            pd.DataFrame({
+                "feature": feature_cols,
+                "importance_mean": importance.importances_mean,
+                "importance_std": importance.importances_std,
+            })
+            .sort_values("importance_mean", ascending=False)
+            .reset_index(drop=True)
+        )
+
+        feature_importance_file = feature_dir / f"{course_name}_feature_importance.csv"
+        feature_importance_df.to_csv(feature_importance_file, index=False)
+        logging.info(
+            "Feature importance saved | course=%s | file=%s | top_features=%s",
+            course_name,
+            feature_importance_file,
+            feature_importance_df.head(7)["feature"].tolist(),
+        )
+    except Exception as e:
+        logging.warning("Feature importance computation failed for course=%s: %s", course_name, e)
 
     results_df = pd.DataFrame(results).sort_values(
         ["rmse_mean", "mae_mean", "mape_mean"]
@@ -523,15 +604,36 @@ def recursive_forecast_course(course_df: pd.DataFrame, fitted_pipeline, target_c
         current_row = featured[featured[DATE_COL] == forecast_date].copy()
 
         lag_cols = [c for c in featured.columns if "_lag_" in c or "_roll_" in c]
-        current_row = current_row.dropna(subset=lag_cols, how="any")
 
         if current_row.empty:
             logging.warning(
-                "Skipping forecast step due to missing lag features | course=%s | forecast_date=%s",
+                "Skipping forecast step because row not found | course=%s | forecast_date=%s",
                 course_name,
                 forecast_date,
             )
             continue
+
+        # allow imputation of missing lag/rolling values via pipeline, rather than skipping
+        if current_row[lag_cols].isna().all(axis=1).iloc[0]:
+            logging.warning(
+                "Forecast step has all lag/roll_na on row; applying persistence fallback | course=%s | forecast_date=%s",
+                course_name,
+                forecast_date,
+            )
+            # use last known value from history or previous forecast
+            previous_value = work_df[work_df[DATE_COL] < forecast_date][target_col].dropna()
+            if not previous_value.empty:
+                pred = previous_value.iloc[-1]
+                forecast_rows.append({DATE_COL: forecast_date, COURSE_COL: course_name, "prediction": float(pred)})
+                work_df.loc[work_df[DATE_COL] == forecast_date, target_col] = pred
+                continue
+            else:
+                logging.warning(
+                    "No previous value available for persistence fallback | course=%s | forecast_date=%s",
+                    course_name,
+                    forecast_date,
+                )
+                continue
 
         numeric_cols, categorical_cols = get_feature_columns(featured, target_col=target_col)
         X_current = current_row[numeric_cols + categorical_cols].copy()
@@ -572,12 +674,66 @@ def recursive_forecast_course(course_df: pd.DataFrame, fitted_pipeline, target_c
 # -----------------------------------------------------------------------------
 # MAIN
 # -----------------------------------------------------------------------------
+def plot_forecast_vs_actual(actual_df: pd.DataFrame, forecast_df: pd.DataFrame):
+    outdir = Path("forecast/forecast_metrics")
+    outdir.mkdir(parents=True, exist_ok=True)
+
+    # Load model results to get top 5 models per course
+    model_results_path = outdir / "per_course_model_results.csv"
+    if not model_results_path.exists():
+        logging.warning("Model results file not found: %s", model_results_path)
+        return
+    model_results = pd.read_csv(model_results_path)
+
+    for course in sorted(actual_df[COURSE_COL].dropna().unique()):
+        actual_course = actual_df[actual_df[COURSE_COL] == course].sort_values(DATE_COL)
+        if actual_course.empty:
+            continue
+
+        # Get top 5 models by RMSE for this course
+        course_models = model_results[model_results["course"] == course].sort_values("rmse_mean").head(5)
+        if course_models.empty:
+            continue
+
+        plt.figure(figsize=(12, 7))
+        plt.plot(actual_course[DATE_COL], actual_course[TARGET_COL], marker='o', label='actual', color='black', alpha=0.8)
+
+        # For each top model, plot its forecast if available
+        for _, row in course_models.iterrows():
+            model_name = row["model_name"]
+            # Try to find forecast for this model
+            forecast_model_path = outdir / f"{course.replace(' ', '_')}_{model_name}_forecast.csv"
+            if forecast_model_path.exists():
+                model_forecast = pd.read_csv(forecast_model_path)
+                model_forecast[DATE_COL] = pd.to_datetime(model_forecast[DATE_COL])
+                plt.plot(model_forecast[DATE_COL], model_forecast['prediction'], marker='x', linestyle='--', label=f"{model_name}")
+            else:
+                # fallback: plot from main forecast_df if available (if only best model forecasts are saved)
+                model_forecast = forecast_df[(forecast_df[COURSE_COL] == course)]
+                if not model_forecast.empty:
+                    plt.plot(model_forecast[DATE_COL], model_forecast['prediction'], marker='x', linestyle='--', label=f"{model_name}")
+
+        plt.title(f"Forecast vs Actual for {course} (Top 5 Models)")
+        plt.xlabel("Date")
+        plt.ylabel(TARGET_COL)
+        plt.legend()
+        plt.tight_layout()
+
+        filepath = outdir / f"{course.replace(' ', '_')}_forecast_vs_actual_top5.png"
+        plt.savefig(filepath)
+        plt.close()
+        logging.info("Saved forecast plot | course=%s | file=%s", course, filepath)
+
+
 def main():
     logging.info("Script started")
     logging.info("Reading data from %s", DATA_PATH.resolve())
 
     if not DATA_PATH.exists():
         raise FileNotFoundError(f"Could not find {DATA_PATH.resolve()}")
+
+    outdir = Path("forecast/forecast_metrics")
+    outdir.mkdir(parents=True, exist_ok=True)
 
     df = pd.read_csv(DATA_PATH)
     logging.info("Data loaded successfully | shape=%s", df.shape)
@@ -650,7 +806,7 @@ def main():
 
     if all_model_results:
         model_results_df = pd.concat(all_model_results, ignore_index=True)
-        model_results_df.to_csv("per_course_model_results.csv", index=False)
+        model_results_df.to_csv("forecast/forecast_metrics/per_course_model_results.csv", index=False)
         logging.info(
             "Saved per_course_model_results.csv | rows=%s",
             len(model_results_df),
@@ -658,7 +814,7 @@ def main():
 
     if best_model_summary:
         best_model_df = pd.DataFrame(best_model_summary).sort_values("course")
-        best_model_df.to_csv("per_course_best_models.csv", index=False)
+        best_model_df.to_csv("forecast/forecast_metrics/per_course_best_models.csv", index=False)
         logging.info(
             "Saved per_course_best_models.csv | rows=%s",
             len(best_model_df),
@@ -671,7 +827,7 @@ def main():
             logging.warning("All course forecasts are empty; skipping output files")
         else:
             forecast_df = forecast_df.sort_values([COURSE_COL, DATE_COL]).reset_index(drop=True)
-            forecast_df.to_csv("per_course_monthly_forecast_12m.csv", index=False)
+            forecast_df.to_csv("forecast/forecast_metrics/per_course_monthly_forecast_12m.csv", index=False)
             logging.info(
                 "Saved per_course_monthly_forecast_12m.csv | rows=%s",
                 len(forecast_df),
@@ -682,11 +838,16 @@ def main():
                 .sum()
                 .rename(columns={"prediction": "forecast_students"})
             )
-            annual_summary.to_csv("per_course_annual_forecast.csv", index=False)
+            annual_summary.to_csv("forecast/forecast_metrics/per_course_annual_forecast.csv", index=False)
             logging.info(
                 "Saved per_course_annual_forecast.csv | rows=%s",
                 len(annual_summary),
             )
             logging.info("Annual forecast summary:\n%s", annual_summary.to_string(index=False))
+
+            # Plot forecast vs actual and future forecast visualization
+            plot_forecast_vs_actual(df, forecast_df)
+
+    logging.info("Script finished successfully")
 
 main()

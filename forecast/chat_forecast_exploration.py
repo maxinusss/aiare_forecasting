@@ -1,21 +1,12 @@
 import logging
 from pathlib import Path
-
-import numpy as np
-import pandas as pd
-
+from itertools import product
 import os
 
-# Set working directory to project root (parent of eda folder)
-os.chdir(Path(__file__).parent.parent)
-
-import logging
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
-from itertools import product
 from sklearn.base import clone
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
@@ -31,10 +22,16 @@ from sklearn.svm import SVR
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
-from sklearn.base import clone
 from sklearn.inspection import permutation_importance
-import matplotlib.pyplot as plt
 
+from pandas.tseries.holiday import USFederalHolidayCalendar
+from statsmodels.tsa.seasonal import STL
+from statsmodels.tsa.stattools import adfuller, kpss
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+
+
+# Set working directory to project root (parent of eda folder)
+os.chdir(Path(__file__).parent.parent)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -53,14 +50,16 @@ FORECAST_HORIZON_MONTHS = 12
 FORECAST_END_DATE = pd.Timestamp("2027-07-31")
 HYPERPARAMETER_TUNING = True
 
-# Keep this light
 LAGS = [1, 2, 3, 12]
-ROLL_WINDOWS = [3, 12]
+ROLL_WINDOWS = [3, 6, 12]
 
 MIN_TRAIN_MONTHS = 24
 VALID_MONTHS = 3
 
-# Base models to evaluate
+RUN_DIAGNOSTICS = True
+DIAGNOSTICS_LAGS = 24
+CONFIDENCE_LEVELS = [0.80, 0.95]
+
 MODEL_SPECS = {
     "ridge": Ridge(),
     "lasso": Lasso(max_iter=10000),
@@ -74,7 +73,6 @@ MODEL_SPECS = {
     "svr": SVR(kernel="rbf"),
 }
 
-# Candidate hyperparameter grids (for manual search with our CV split style)
 MODEL_PARAM_GRID = {
     "ridge": {
         "model__alpha": [0.01, 0.1, 1.0, 10.0, 50.0, 100.0],
@@ -156,7 +154,6 @@ def add_time_features(df: pd.DataFrame) -> pd.DataFrame:
     out["quarter_sin"] = np.sin(2 * np.pi * out["quarter"] / 4)
     out["quarter_cos"] = np.cos(2 * np.pi * out["quarter"] / 4)
 
-    # Seasonal indicator columns for month vs year cycle
     out["is_winter"] = out["month_num"].isin([12, 1, 2]).astype(int)
     out["is_spring"] = out["month_num"].isin([3, 4, 5]).astype(int)
     out["is_summer"] = out["month_num"].isin([6, 7, 8]).astype(int)
@@ -171,6 +168,64 @@ def add_time_features(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def add_calendar_features(df: pd.DataFrame) -> pd.DataFrame:
+    out = df.copy()
+    out[DATE_COL] = pd.to_datetime(out[DATE_COL])
+    out = out.sort_values(DATE_COL).reset_index(drop=True)
+
+    out["is_month_start"] = out[DATE_COL].dt.is_month_start.astype(int)
+    out["is_month_end"] = out[DATE_COL].dt.is_month_end.astype(int)
+    out["days_in_month"] = out[DATE_COL].dt.days_in_month
+
+    month_start = out[DATE_COL].dt.to_period("M").dt.to_timestamp()
+    month_end = month_start + pd.offsets.MonthEnd(0)
+    out["month_length_days"] = (month_end - month_start).dt.days + 1
+
+    cal = USFederalHolidayCalendar()
+    holiday_dates = cal.holidays(
+        start=out[DATE_COL].min() - pd.Timedelta(days=31),
+        end=out[DATE_COL].max() + pd.Timedelta(days=31),
+    )
+    holiday_df = pd.DataFrame({"holiday_date": pd.to_datetime(holiday_dates)})
+    holiday_df["month_start"] = holiday_df["holiday_date"].dt.to_period("M").dt.to_timestamp()
+    monthly_holiday_counts = (
+        holiday_df.groupby("month_start").size().rename("holiday_count_in_month").reset_index()
+    )
+
+    out["month_start"] = out[DATE_COL].dt.to_period("M").dt.to_timestamp()
+    out = out.merge(monthly_holiday_counts, on="month_start", how="left")
+    out["holiday_count_in_month"] = out["holiday_count_in_month"].fillna(0)
+    out = out.drop(columns=["month_start"])
+
+    return out
+
+
+def add_trend_and_interaction_features(df: pd.DataFrame) -> pd.DataFrame:
+    out = df.copy()
+    out = out.sort_values(DATE_COL).reset_index(drop=True)
+
+    out["time_idx"] = np.arange(len(out))
+    out["time_idx_sq"] = out["time_idx"] ** 2
+    out["year_month_index"] = out["year_num"] * 12 + out["month_num"]
+
+    first_date = pd.to_datetime(out[DATE_COL]).min()
+    out["months_since_start"] = (
+        (out[DATE_COL].dt.year - first_date.year) * 12
+        + (out[DATE_COL].dt.month - first_date.month)
+    )
+
+    out["summer_trend"] = out["is_summer"] * out["time_idx"]
+    out["winter_trend"] = out["is_winter"] * out["time_idx"]
+    out["spring_trend"] = out["is_spring"] * out["time_idx"]
+    out["fall_trend"] = out["is_fall"] * out["time_idx"]
+
+    if "covid_flag" in out.columns:
+        out["covid_x_month_sin"] = out["covid_flag"] * out["month_sin"]
+        out["covid_x_month_cos"] = out["covid_flag"] * out["month_cos"]
+
+    return out
+
+
 def add_lag_features(df: pd.DataFrame, target_col: str) -> pd.DataFrame:
     out = df.copy()
     out = out.sort_values(DATE_COL).reset_index(drop=True)
@@ -179,14 +234,18 @@ def add_lag_features(df: pd.DataFrame, target_col: str) -> pd.DataFrame:
         out[f"{target_col}_lag_{lag}"] = out[target_col].shift(lag)
 
     for window in ROLL_WINDOWS:
-        out[f"{target_col}_roll_mean_{window}"] = out[target_col].shift(1).rolling(window).mean()
+        shifted = out[target_col].shift(1)
+        out[f"{target_col}_roll_mean_{window}"] = shifted.rolling(window).mean()
+        out[f"{target_col}_roll_std_{window}"] = shifted.rolling(window).std()
+        out[f"{target_col}_roll_min_{window}"] = shifted.rolling(window).min()
+        out[f"{target_col}_roll_max_{window}"] = shifted.rolling(window).max()
 
-    # Seasonal seasonality features
-    out[f"{target_col}_lag_12"] = out[target_col].shift(12)
-    out[f"{target_col}_seasonal_diff"] = out[target_col] - out[target_col].shift(12)
-    out[f"{target_col}_roll_mean_12"] = out[target_col].shift(1).rolling(12).mean()
+    out[f"{target_col}_seasonal_diff_12"] = out[target_col].shift(1) - out[target_col].shift(13)
+    # seasonal_ratio_12 removed: at forecast time target is NaN → ratio is NaN → imputed to training median, distorting predictions
+    out[f"{target_col}_yoy_change"] = out[target_col].shift(1) - out[target_col].shift(13)
+    out[f"{target_col}_lag_12_vs_6"] = out[target_col].shift(12) - out[target_col].shift(6)
 
-    lag_cols = [c for c in out.columns if "_lag_" in c or "_roll_" in c or "_seasonal_diff" in c]
+    lag_cols = [c for c in out.columns if "_lag_" in c or "_roll_" in c or "_seasonal_" in c or "_yoy_" in c]
     logging.info(
         "Added lag/rolling/seasonal features | target=%s | lag_feature_count=%s",
         target_col,
@@ -204,6 +263,8 @@ def build_course_frame(course_df: pd.DataFrame, target_col: str) -> pd.DataFrame
     out = out.sort_values(DATE_COL).reset_index(drop=True)
 
     out = add_time_features(out)
+    out = add_calendar_features(out)
+    out = add_trend_and_interaction_features(out)
     out = add_lag_features(out, target_col=target_col)
 
     logging.info(
@@ -277,6 +338,89 @@ def make_preprocessor(numeric_cols, categorical_cols):
 
 
 # -----------------------------------------------------------------------------
+# DIAGNOSTICS
+# -----------------------------------------------------------------------------
+def safe_adf(series: pd.Series):
+    try:
+        stat, pvalue, _, _, _, _ = adfuller(series.dropna(), autolag="AIC")
+        return stat, pvalue
+    except Exception as e:
+        logging.warning("ADF failed: %s", e)
+        return np.nan, np.nan
+
+
+def safe_kpss(series: pd.Series):
+    try:
+        stat, pvalue, _, _ = kpss(series.dropna(), regression="c", nlags="auto")
+        return stat, pvalue
+    except Exception as e:
+        logging.warning("KPSS failed: %s", e)
+        return np.nan, np.nan
+
+
+def run_course_diagnostics(course_df: pd.DataFrame, target_col: str, outdir: Path):
+    course_name = course_df[COURSE_COL].iloc[0]
+    diag_dir = outdir / "diagnostics"
+    diag_dir.mkdir(parents=True, exist_ok=True)
+
+    series_df = course_df[[DATE_COL, target_col]].dropna().copy()
+    series_df[DATE_COL] = pd.to_datetime(series_df[DATE_COL])
+    series_df = series_df.sort_values(DATE_COL)
+    series = series_df.set_index(DATE_COL)[target_col].asfreq("MS")
+
+    if len(series.dropna()) < 24:
+        logging.warning("Skipping diagnostics for course=%s because series is too short", course_name)
+        return
+
+    adf_stat, adf_pvalue = safe_adf(series)
+    kpss_stat, kpss_pvalue = safe_kpss(series)
+
+    diag_row = {
+        "course": course_name,
+        "n_obs": len(series.dropna()),
+        "mean": series.mean(),
+        "std": series.std(),
+        "min": series.min(),
+        "max": series.max(),
+        "adf_stat": adf_stat,
+        "adf_pvalue": adf_pvalue,
+        "kpss_stat": kpss_stat,
+        "kpss_pvalue": kpss_pvalue,
+    }
+
+    try:
+        stl = STL(series.interpolate(limit_direction="both"), period=12, robust=True).fit()
+        diag_row["trend_strength"] = 1 - np.var(stl.resid) / np.var(stl.trend + stl.resid)
+        diag_row["seasonal_strength"] = 1 - np.var(stl.resid) / np.var(stl.seasonal + stl.resid)
+
+        stl_plot_path = diag_dir / f"{course_name}_stl.png"
+        fig = stl.plot()
+        fig.set_size_inches(12, 8)
+        plt.tight_layout()
+        plt.savefig(stl_plot_path)
+        plt.close(fig)
+    except Exception as e:
+        logging.warning("STL failed for course=%s: %s", course_name, e)
+        diag_row["trend_strength"] = np.nan
+        diag_row["seasonal_strength"] = np.nan
+
+    try:
+        fig, axes = plt.subplots(2, 1, figsize=(12, 8))
+        plot_acf(series.dropna(), lags=min(DIAGNOSTICS_LAGS, len(series.dropna()) - 1), ax=axes[0])
+        plot_pacf(series.dropna(), lags=min(DIAGNOSTICS_LAGS, len(series.dropna()) // 2 - 1), ax=axes[1], method="ywm")
+        axes[0].set_title(f"ACF - {course_name}")
+        axes[1].set_title(f"PACF - {course_name}")
+        plt.tight_layout()
+        plt.savefig(diag_dir / f"{course_name}_acf_pacf.png")
+        plt.close(fig)
+    except Exception as e:
+        logging.warning("ACF/PACF failed for course=%s: %s", course_name, e)
+
+    pd.DataFrame([diag_row]).to_csv(diag_dir / f"{course_name}_diagnostics.csv", index=False)
+    logging.info("Saved diagnostics for course=%s", course_name)
+
+
+# -----------------------------------------------------------------------------
 # TIME-SERIES VALIDATION
 # -----------------------------------------------------------------------------
 def make_expanding_splits(df: pd.DataFrame, min_train_months: int, valid_months: int):
@@ -318,8 +462,9 @@ def make_expanding_splits(df: pd.DataFrame, min_train_months: int, valid_months:
     return splits
 
 
-def evaluate_model(X, y, pipeline, splits, course_name: str, model_name: str):
+def evaluate_model(X, y, pipeline, splits, course_name: str, model_name: str, date_series: pd.Series):
     fold_rows = []
+    oof_rows = []
 
     logging.info(
         "Starting CV evaluation | course=%s | model=%s | n_splits=%s",
@@ -333,6 +478,7 @@ def evaluate_model(X, y, pipeline, splits, course_name: str, model_name: str):
         y_train = y.loc[train_idx]
         X_valid = X.loc[valid_idx]
         y_valid = y.loc[valid_idx]
+        valid_dates = pd.to_datetime(date_series.loc[valid_idx]).reset_index(drop=True)
 
         logging.info(
             "Fitting fold | course=%s | model=%s | fold=%s | train_shape=%s | valid_shape=%s",
@@ -370,13 +516,30 @@ def evaluate_model(X, y, pipeline, splits, course_name: str, model_name: str):
             }
         )
 
+        for horizon_num, (dt, actual, pred) in enumerate(zip(valid_dates, y_valid.to_numpy(), preds), start=1):
+            oof_rows.append(
+                {
+                    "course": course_name,
+                    "model_name": model_name,
+                    "fold": fold_num,
+                    DATE_COL: dt,
+                    "horizon": horizon_num,
+                    "actual": actual,
+                    "prediction": pred,
+                    "residual": actual - pred,
+                    "abs_error": abs(actual - pred),
+                }
+            )
+
     fold_df = pd.DataFrame(fold_rows)
+    oof_df = pd.DataFrame(oof_rows)
 
     summary = {
         "rmse_mean": fold_df["rmse"].mean(),
         "mae_mean": fold_df["mae"].mean(),
         "mape_mean": fold_df["mape"].mean(),
         "fold_df": fold_df,
+        "oof_df": oof_df,
     }
 
     logging.info(
@@ -391,21 +554,45 @@ def evaluate_model(X, y, pipeline, splits, course_name: str, model_name: str):
     return summary
 
 
+def build_residual_quantiles(oof_df: pd.DataFrame):
+    residual_quantiles = {}
+    if oof_df.empty:
+        return residual_quantiles
+
+    for horizon, grp in oof_df.groupby("horizon"):
+        residuals = grp["residual"].dropna().to_numpy()
+        if len(residuals) == 0:
+            continue
+        residual_quantiles[horizon] = {}
+        for conf in CONFIDENCE_LEVELS:
+            alpha = 1 - conf
+            lower_q = float(np.quantile(residuals, alpha / 2))
+            upper_q = float(np.quantile(residuals, 1 - alpha / 2))
+            residual_quantiles[horizon][conf] = (lower_q, upper_q)
+
+    return residual_quantiles
+
+
 # -----------------------------------------------------------------------------
 # MODEL TRAINING PER COURSE
 # -----------------------------------------------------------------------------
-def train_best_model_for_course(course_df: pd.DataFrame, target_col: str):
+def train_best_model_for_course(course_df: pd.DataFrame, target_col: str, outdir: Path):
     course_name = course_df[COURSE_COL].iloc[0]
     logging.info("--------------------------------------------------")
     logging.info("Training started for course=%s", course_name)
     logging.info("Raw course rows=%s", len(course_df))
 
-    df = build_course_frame(course_df, target_col=target_col)
+    if RUN_DIAGNOSTICS:
+        run_course_diagnostics(course_df, target_col=target_col, outdir=outdir)
 
+    df = build_course_frame(course_df, target_col=target_col)
     df = df[df[target_col].notna()].copy()
     logging.info("Rows after dropping missing target | course=%s | rows=%s", course_name, len(df))
 
-    lag_cols = [c for c in df.columns if "_lag_" in c or "_roll_" in c]
+    lag_cols = [
+        c for c in df.columns
+        if "_lag_" in c or "_roll_" in c or "_seasonal_" in c or "_yoy_" in c
+    ]
     logging.info("Lag columns for course=%s: %s", course_name, lag_cols)
 
     df = df.dropna(subset=lag_cols, how="any").copy()
@@ -430,6 +617,7 @@ def train_best_model_for_course(course_df: pd.DataFrame, target_col: str):
     feature_cols = numeric_cols + categorical_cols
     X = df[feature_cols].copy()
     y = df[target_col].copy()
+    date_series = pd.to_datetime(df[DATE_COL]).copy()
 
     logging.info(
         "Prepared modeling matrices | course=%s | X_shape=%s | y_len=%s",
@@ -452,15 +640,14 @@ def train_best_model_for_course(course_df: pd.DataFrame, target_col: str):
     best_name = None
     best_pipeline = None
     best_rmse = None
+    best_oof_df = pd.DataFrame()
+    best_residual_quantiles = {}
 
     for model_name, model in MODEL_SPECS.items():
         logging.info("Testing model | course=%s | model=%s", course_name, model_name)
 
-        param_grid = MODEL_PARAM_GRID.get(model_name, {})
-        if not param_grid:
-            param_grid = {}
+        param_grid = MODEL_PARAM_GRID.get(model_name, {}) or {}
 
-        # Build candidate parameter sets
         if HYPERPARAMETER_TUNING and param_grid:
             keys = list(param_grid.keys())
             values_product = list(product(*param_grid.values()))
@@ -469,7 +656,9 @@ def train_best_model_for_course(course_df: pd.DataFrame, target_col: str):
             candidates = [{}]
 
         for candidate_params in candidates:
-            candidate_model = clone(model).set_params(**{k.replace('model__', ''): v for k, v in candidate_params.items()})
+            candidate_model = clone(model).set_params(
+                **{k.replace("model__", ""): v for k, v in candidate_params.items()}
+            )
 
             pipeline = Pipeline(
                 steps=[
@@ -480,7 +669,9 @@ def train_best_model_for_course(course_df: pd.DataFrame, target_col: str):
 
             candidate_label = model_name
             if candidate_params:
-                candidate_label = f"{model_name}_" + "_".join([f"{k.split('__')[-1]}={v}" for k, v in candidate_params.items()])
+                candidate_label = f"{model_name}_" + "_".join(
+                    [f"{k.split('__')[-1]}={v}" for k, v in candidate_params.items()]
+                )
 
             metrics = evaluate_model(
                 X=X,
@@ -489,6 +680,7 @@ def train_best_model_for_course(course_df: pd.DataFrame, target_col: str):
                 splits=splits,
                 course_name=course_name,
                 model_name=candidate_label,
+                date_series=date_series,
             )
 
             results.append(
@@ -505,6 +697,8 @@ def train_best_model_for_course(course_df: pd.DataFrame, target_col: str):
                 best_rmse = metrics["rmse_mean"]
                 best_name = candidate_label
                 best_pipeline = pipeline
+                best_oof_df = metrics["oof_df"].copy()
+                best_residual_quantiles = build_residual_quantiles(best_oof_df)
                 logging.info(
                     "New best model found | course=%s | model=%s | rmse=%.4f",
                     course_name,
@@ -519,8 +713,7 @@ def train_best_model_for_course(course_df: pd.DataFrame, target_col: str):
     logging.info("Refitting best model on full course history | course=%s | model=%s", course_name, best_name)
     best_pipeline.fit(X, y)
 
-    # Feature importance analysis
-    feature_dir = Path("forecast/forecast_metrics")
+    feature_dir = outdir
     feature_dir.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -546,6 +739,20 @@ def train_best_model_for_course(course_df: pd.DataFrame, target_col: str):
     except Exception as e:
         logging.warning("Feature importance computation failed for course=%s: %s", course_name, e)
 
+    if not best_oof_df.empty:
+        best_oof_df.to_csv(feature_dir / f"{course_name}_best_model_oof_predictions.csv", index=False)
+
+    residual_rows = []
+    for horizon, horizon_map in best_residual_quantiles.items():
+        row = {"course": course_name, "horizon": horizon}
+        for conf, (lower_q, upper_q) in horizon_map.items():
+            pct = int(conf * 100)
+            row[f"residual_q_low_{pct}"] = lower_q
+            row[f"residual_q_high_{pct}"] = upper_q
+        residual_rows.append(row)
+    if residual_rows:
+        pd.DataFrame(residual_rows).to_csv(feature_dir / f"{course_name}_residual_quantiles.csv", index=False)
+
     results_df = pd.DataFrame(results).sort_values(
         ["rmse_mean", "mae_mean", "mape_mean"]
     ).reset_index(drop=True)
@@ -559,6 +766,7 @@ def train_best_model_for_course(course_df: pd.DataFrame, target_col: str):
         "feature_cols": feature_cols,
         "best_model_name": best_name,
         "best_pipeline": best_pipeline,
+        "best_residual_quantiles": best_residual_quantiles,
         "results_df": results_df,
     }
 
@@ -575,9 +783,8 @@ def build_future_stub(course_df: pd.DataFrame, target_col: str, horizon_months: 
     last_row = course_df.iloc[-1].copy()
     last_date = course_df[DATE_COL].max()
 
-    # Limit the forecast horizon to July 2027 at most
     start_date = last_date + pd.offsets.MonthBegin(1)
-    end_date = min(start_date + pd.DateOffset(months=horizon_months-1), FORECAST_END_DATE)
+    end_date = min(start_date + pd.DateOffset(months=horizon_months - 1), FORECAST_END_DATE)
 
     if start_date > end_date:
         logging.warning(
@@ -588,11 +795,7 @@ def build_future_stub(course_df: pd.DataFrame, target_col: str, horizon_months: 
         )
         return pd.DataFrame(columns=[DATE_COL, COURSE_COL, "prediction", "year", "month"])
 
-    future_dates = pd.date_range(
-        start_date,
-        end=end_date,
-        freq="MS",
-    )
+    future_dates = pd.date_range(start_date, end=end_date, freq="MS")
 
     logging.info(
         "Building future stub | course=%s | last_date=%s | horizon_months=%s",
@@ -619,7 +822,36 @@ def build_future_stub(course_df: pd.DataFrame, target_col: str, horizon_months: 
     return future_df
 
 
-def recursive_forecast_course(course_df: pd.DataFrame, fitted_pipeline, target_col: str, horizon_months: int):
+def add_prediction_intervals(pred: float, step_num: int, residual_quantiles: dict):
+    interval_values = {}
+
+    horizon_key = step_num if step_num in residual_quantiles else max(residual_quantiles.keys(), default=None)
+    if horizon_key is None:
+        for conf in CONFIDENCE_LEVELS:
+            pct = int(conf * 100)
+            interval_values[f"lower_{pct}"] = np.nan
+            interval_values[f"upper_{pct}"] = np.nan
+        return interval_values
+
+    growth_factor = np.sqrt(step_num / max(horizon_key, 1))
+
+    for conf in CONFIDENCE_LEVELS:
+        pct = int(conf * 100)
+        if conf not in residual_quantiles[horizon_key]:
+            interval_values[f"lower_{pct}"] = np.nan
+            interval_values[f"upper_{pct}"] = np.nan
+            continue
+
+        low_q, high_q = residual_quantiles[horizon_key][conf]
+        lower_bound = max(0, pred + low_q * growth_factor)
+        upper_bound = max(0, pred + high_q * growth_factor)
+        interval_values[f"lower_{pct}"] = lower_bound
+        interval_values[f"upper_{pct}"] = upper_bound
+
+    return interval_values
+
+
+def recursive_forecast_course(course_df: pd.DataFrame, fitted_pipeline, target_col: str, horizon_months: int, residual_quantiles: dict):
     course_name = course_df[COURSE_COL].iloc[0]
     logging.info("Starting recursive forecast | course=%s", course_name)
 
@@ -634,13 +866,16 @@ def recursive_forecast_course(course_df: pd.DataFrame, fitted_pipeline, target_c
     forecast_dates = sorted(future_stub[DATE_COL].unique())
     forecast_rows = []
 
-    for forecast_date in forecast_dates:
+    for step_num, forecast_date in enumerate(forecast_dates, start=1):
         logging.info("Forecasting step | course=%s | forecast_date=%s", course_name, forecast_date)
 
         featured = build_course_frame(work_df, target_col=target_col)
         current_row = featured[featured[DATE_COL] == forecast_date].copy()
 
-        lag_cols = [c for c in featured.columns if "_lag_" in c or "_roll_" in c]
+        lag_cols = [
+            c for c in featured.columns
+            if "_lag_" in c or "_roll_" in c or "_seasonal_" in c or "_yoy_" in c
+        ]
 
         if current_row.empty:
             logging.warning(
@@ -650,33 +885,34 @@ def recursive_forecast_course(course_df: pd.DataFrame, fitted_pipeline, target_c
             )
             continue
 
-        # allow imputation of missing lag/rolling values via pipeline, rather than skipping
         if current_row[lag_cols].isna().all(axis=1).iloc[0]:
             logging.warning(
                 "Forecast step has all lag/roll_na on row; applying persistence fallback | course=%s | forecast_date=%s",
                 course_name,
                 forecast_date,
             )
-            # use last known value from history or previous forecast
             previous_value = work_df[work_df[DATE_COL] < forecast_date][target_col].dropna()
             if not previous_value.empty:
-                pred = previous_value.iloc[-1]
-                forecast_rows.append({DATE_COL: forecast_date, COURSE_COL: course_name, "prediction": float(pred)})
+                pred = float(previous_value.iloc[-1])
+                interval_values = add_prediction_intervals(pred, step_num, residual_quantiles)
+                forecast_rows.append(
+                    {DATE_COL: forecast_date, COURSE_COL: course_name, "prediction": pred, **interval_values}
+                )
                 work_df.loc[work_df[DATE_COL] == forecast_date, target_col] = pred
                 continue
-            else:
-                logging.warning(
-                    "No previous value available for persistence fallback | course=%s | forecast_date=%s",
-                    course_name,
-                    forecast_date,
-                )
-                continue
+            logging.warning(
+                "No previous value available for persistence fallback | course=%s | forecast_date=%s",
+                course_name,
+                forecast_date,
+            )
+            continue
 
         numeric_cols, categorical_cols = get_feature_columns(featured, target_col=target_col)
         X_current = current_row[numeric_cols + categorical_cols].copy()
 
         pred = fitted_pipeline.predict(X_current)[0]
         pred = max(pred, 0)
+        interval_values = add_prediction_intervals(pred, step_num, residual_quantiles)
 
         logging.info(
             "Forecast complete | course=%s | forecast_date=%s | prediction=%.3f",
@@ -690,6 +926,7 @@ def recursive_forecast_course(course_df: pd.DataFrame, fitted_pipeline, target_c
                 DATE_COL: forecast_date,
                 COURSE_COL: course_name,
                 "prediction": pred,
+                **interval_values,
             }
         )
 
@@ -715,7 +952,6 @@ def plot_forecast_vs_actual(actual_df: pd.DataFrame, forecast_df: pd.DataFrame):
     outdir = Path("forecast/forecast_metrics")
     outdir.mkdir(parents=True, exist_ok=True)
 
-    # Load model results to get top 5 models per course
     model_results_path = outdir / "per_course_model_results.csv"
     if not model_results_path.exists():
         logging.warning("Model results file not found: %s", model_results_path)
@@ -727,36 +963,42 @@ def plot_forecast_vs_actual(actual_df: pd.DataFrame, forecast_df: pd.DataFrame):
         if actual_course.empty:
             continue
 
-        # Get top 5 models by RMSE for this course
         course_models = model_results[model_results["course"] == course].sort_values("rmse_mean").head(5)
         if course_models.empty:
             continue
 
         plt.figure(figsize=(12, 7))
-        plt.plot(actual_course[DATE_COL], actual_course[TARGET_COL], marker='o', label='actual', color='black', alpha=0.8)
+        plt.plot(actual_course[DATE_COL], actual_course[TARGET_COL], marker="o", label="actual", color="black", alpha=0.8)
 
-        # For each top model, plot its forecast if available
-        for _, row in course_models.iterrows():
-            model_name = row["model_name"]
-            # Try to find forecast for this model
-            forecast_model_path = outdir / f"{course.replace(' ', '_')}_{model_name}_forecast.csv"
-            if forecast_model_path.exists():
-                model_forecast = pd.read_csv(forecast_model_path)
-                model_forecast[DATE_COL] = pd.to_datetime(model_forecast[DATE_COL])
-                plt.plot(model_forecast[DATE_COL], model_forecast['prediction'], marker='x', linestyle='--', label=f"{model_name}")
-            else:
-                # fallback: plot from main forecast_df if available (if only best model forecasts are saved)
-                model_forecast = forecast_df[(forecast_df[COURSE_COL] == course)]
-                if not model_forecast.empty:
-                    plt.plot(model_forecast[DATE_COL], model_forecast['prediction'], marker='x', linestyle='--', label=f"{model_name}")
+        model_forecast = forecast_df[(forecast_df[COURSE_COL] == course)].copy()
+        if not model_forecast.empty:
+            plt.plot(model_forecast[DATE_COL], model_forecast["prediction"], marker="x", linestyle="--", label="best forecast")
 
-        plt.title(f"Forecast vs Actual for {course} (Top 5 Models)")
+            if {"lower_80", "upper_80"}.issubset(model_forecast.columns):
+                plt.fill_between(
+                    model_forecast[DATE_COL],
+                    model_forecast["lower_80"],
+                    model_forecast["upper_80"],
+                    alpha=0.20,
+                    label="80% interval",
+                )
+
+            if {"lower_95", "upper_95"}.issubset(model_forecast.columns):
+                plt.fill_between(
+                    model_forecast[DATE_COL],
+                    model_forecast["lower_95"],
+                    model_forecast["upper_95"],
+                    alpha=0.12,
+                    label="95% interval",
+                )
+
+        plt.title(f"Forecast vs Actual for {course}")
         plt.xlabel("Date")
         plt.ylabel(TARGET_COL)
         plt.legend()
         plt.tight_layout()
 
-        filepath = outdir / f"{course.replace(' ', '_')}_forecast_vs_actual_top5.png"
+        filepath = outdir / f"{course.replace(' ', '_')}_forecast_vs_actual.png"
         plt.savefig(filepath)
         plt.close()
         logging.info("Saved forecast plot | course=%s | file=%s", course, filepath)
@@ -803,7 +1045,7 @@ def main():
             course_df[DATE_COL].max(),
         )
 
-        trained = train_best_model_for_course(course_df, target_col=TARGET_COL)
+        trained = train_best_model_for_course(course_df, target_col=TARGET_COL, outdir=outdir)
         if trained is None:
             logging.warning("Skipping course=%s because training returned None", course)
             continue
@@ -835,6 +1077,7 @@ def main():
             fitted_pipeline=trained["best_pipeline"],
             target_col=TARGET_COL,
             horizon_months=FORECAST_HORIZON_MONTHS,
+            residual_quantiles=trained["best_residual_quantiles"],
         )
         if not forecast_df.empty:
             all_forecasts.append(forecast_df)
@@ -843,19 +1086,13 @@ def main():
 
     if all_model_results:
         model_results_df = pd.concat(all_model_results, ignore_index=True)
-        model_results_df.to_csv("forecast/forecast_metrics/per_course_model_results.csv", index=False)
-        logging.info(
-            "Saved per_course_model_results.csv | rows=%s",
-            len(model_results_df),
-        )
+        model_results_df.to_csv(outdir / "per_course_model_results.csv", index=False)
+        logging.info("Saved per_course_model_results.csv | rows=%s", len(model_results_df))
 
     if best_model_summary:
         best_model_df = pd.DataFrame(best_model_summary).sort_values("course")
-        best_model_df.to_csv("forecast/forecast_metrics/per_course_best_models.csv", index=False)
-        logging.info(
-            "Saved per_course_best_models.csv | rows=%s",
-            len(best_model_df),
-        )
+        best_model_df.to_csv(outdir / "per_course_best_models.csv", index=False)
+        logging.info("Saved per_course_best_models.csv | rows=%s", len(best_model_df))
         logging.info("Best models summary:\n%s", best_model_df.to_string(index=False))
 
     if all_forecasts:
@@ -864,27 +1101,22 @@ def main():
             logging.warning("All course forecasts are empty; skipping output files")
         else:
             forecast_df = forecast_df.sort_values([COURSE_COL, DATE_COL]).reset_index(drop=True)
-            forecast_df.to_csv("forecast/forecast_metrics/per_course_monthly_forecast_12m.csv", index=False)
-            logging.info(
-                "Saved per_course_monthly_forecast_12m.csv | rows=%s",
-                len(forecast_df),
-            )
+            forecast_df.to_csv(outdir / "per_course_monthly_forecast_12m.csv", index=False)
+            logging.info("Saved per_course_monthly_forecast_12m.csv | rows=%s", len(forecast_df))
 
             annual_summary = (
                 forecast_df.groupby([COURSE_COL, "year"], as_index=False)["prediction"]
                 .sum()
                 .rename(columns={"prediction": "forecast_students"})
             )
-            annual_summary.to_csv("forecast/forecast_metrics/per_course_annual_forecast.csv", index=False)
-            logging.info(
-                "Saved per_course_annual_forecast.csv | rows=%s",
-                len(annual_summary),
-            )
+            annual_summary.to_csv(outdir / "per_course_annual_forecast.csv", index=False)
+            logging.info("Saved per_course_annual_forecast.csv | rows=%s", len(annual_summary))
             logging.info("Annual forecast summary:\n%s", annual_summary.to_string(index=False))
 
-            # Plot forecast vs actual and future forecast visualization
             plot_forecast_vs_actual(df, forecast_df)
 
     logging.info("Script finished successfully")
 
-main()
+
+if __name__ == "__main__":
+    main()

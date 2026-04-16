@@ -1,0 +1,16 @@
+date,combined_course,forecast_num_students,forecast_single_best,best_model_family,best_model_params,ensemble_n_models
+2026-06-01,aiare 1,48.48567660375353,0.0,prophet,"{""yearly_seasonality"": true, ""seasonality_mode"": ""multiplicative""}",3
+2026-07-01,aiare 1,3.555616284275259,0.0,prophet,"{""yearly_seasonality"": true, ""seasonality_mode"": ""multiplicative""}",3
+2026-08-01,aiare 1,0.0,0.0,prophet,"{""yearly_seasonality"": true, ""seasonality_mode"": ""multiplicative""}",3
+2026-09-01,aiare 1,0.0,0.0,prophet,"{""yearly_seasonality"": true, ""seasonality_mode"": ""multiplicative""}",3
+2026-10-01,aiare 1,7.757708256600565,0.0,prophet,"{""yearly_seasonality"": true, ""seasonality_mode"": ""multiplicative""}",3
+2026-11-01,aiare 1,16.835504130977185,47.98143850317649,prophet,"{""yearly_seasonality"": true, ""seasonality_mode"": ""multiplicative""}",3
+2026-12-01,aiare 1,371.99344835564716,1060.186889979697,prophet,"{""yearly_seasonality"": true, ""seasonality_mode"": ""multiplicative""}",3
+2027-01-01,aiare 1,619.6042672100009,1765.8814260714864,prophet,"{""yearly_seasonality"": true, ""seasonality_mode"": ""multiplicative""}",3
+2027-02-01,aiare 1,974.4208059296159,1159.7988014947828,prophet,"{""yearly_seasonality"": true, ""seasonality_mode"": ""multiplicative""}",3
+2027-03-01,aiare 1,2056.6184342508354,643.1048376908166,prophet,"{""yearly_seasonality"": true, ""seasonality_mode"": ""multiplicative""}",3
+2027-04-01,aiare 1,958.4379358447868,109.98715402107901,prophet,"{""yearly_seasonality"": true, ""seasonality_mode"": ""multiplicative""}",3
+2027-05-01,aiare 1,286.59428906307267,0.0,prophet,"{""yearly_seasonality"": true, ""seasonality_mode"": ""multiplicative""}",3
+2027-06-01,aiare 1,48.48567660375353,0.0,prophet,"{""yearly_seasonality"": true, ""seasonality_mode"": ""multiplicative""}",3
+2027-07-01,aiare 1,3.555616284275259,0.0,prophet,"{""yearly_seasonality"": true, ""seasonality_mode"": ""multiplicative""}",3
+2027-08-01,aiare 1,0.0,0.0,prophet,"{""yearly_seasonality"": true, ""seasonality_mode"": ""multiplicative""}",3

@@ -9,6 +9,9 @@ Key fixes over chat_3_forecast_full_restored.py:
 5. Ensemble of top models weighted by CV performance
 6. SARIMAX support
 7. Calendar-only features for future periods (no lag leakage)
+8. Asymmetric loss: over-forecasting is penalised more than under-forecasting.
+   Tree-based models use quantile regression; model selection & ensemble
+   weighting use the asymmetric metric.  Controlled by OVER_FORECAST_PENALTY.
 """
 
 import json
@@ -63,6 +66,10 @@ OUTPUT_DIR = "opus_analysis"
 REPORTING_LAG_MONTHS = 2
 # Number of top models to ensemble (set to 1 to disable ensembling)
 ENSEMBLE_TOP_K = 3
+# Asymmetric loss: penalize over-forecasting more than under-forecasting.
+# Values > 1 penalize over-prediction; e.g. 2.0 means over-predictions are
+# penalized 2x as much as under-predictions in model selection & ensembling.
+OVER_FORECAST_PENALTY = 2.0
 
 
 # =========================
@@ -78,6 +85,15 @@ def safe_mape(y_true, y_pred):
 
 def rmse(y_true, y_pred):
     return np.sqrt(mean_squared_error(y_true, y_pred))
+
+
+def asymmetric_loss(y_true, y_pred, over_penalty=OVER_FORECAST_PENALTY):
+    """Asymmetric MAE: penalise over-forecasts by *over_penalty* relative to under-forecasts."""
+    y_true = np.asarray(y_true, dtype=float)
+    y_pred = np.asarray(y_pred, dtype=float)
+    errors = y_pred - y_true  # positive = over-forecast
+    weights = np.where(errors > 0, over_penalty, 1.0)
+    return np.mean(weights * np.abs(errors))
 
 
 def season_from_month(month):
@@ -530,6 +546,7 @@ def evaluate_direct_sklearn(model, df, target_col, splits, enso_schema, use_log=
             "mae": mean_absolute_error(y_true, pred),
             "rmse": rmse(y_true, pred),
             "mape": safe_mape(y_true, pred),
+            "asym_loss": asymmetric_loss(y_true, pred),
             "n_val": len(y_true),
             "train_end": str(train_df.index.max().date()),
             "val_start": str(val_df.index.min().date()),
@@ -540,6 +557,7 @@ def evaluate_direct_sklearn(model, df, target_col, splits, enso_schema, use_log=
         "mae": mean_absolute_error(actuals, preds),
         "rmse": rmse(actuals, preds),
         "mape": safe_mape(actuals, preds),
+        "asym_loss": asymmetric_loss(actuals, preds),
         "n_preds": len(preds),
         "fold_metrics": fold_rows,
     }
@@ -562,6 +580,7 @@ def evaluate_seasonal_naive(df, target_col, splits):
             "mae": mean_absolute_error(val_y, pred),
             "rmse": rmse(val_y, pred),
             "mape": safe_mape(val_y, pred),
+            "asym_loss": asymmetric_loss(val_y, pred),
             "n_val": len(val_y),
             "train_end": str(df.iloc[train_idx].index.max().date()),
             "val_start": str(df.iloc[val_idx].index.min().date()),
@@ -572,6 +591,7 @@ def evaluate_seasonal_naive(df, target_col, splits):
         "mae": mean_absolute_error(actuals, preds),
         "rmse": rmse(actuals, preds),
         "mape": safe_mape(actuals, preds),
+        "asym_loss": asymmetric_loss(actuals, preds),
         "n_preds": len(preds),
         "fold_metrics": fold_rows,
     }
@@ -605,6 +625,7 @@ def evaluate_ets_model_with_params(df, target_col, splits, trend, seasonal, damp
             "mae": mean_absolute_error(val_y, pred),
             "rmse": rmse(val_y, pred),
             "mape": safe_mape(val_y, pred),
+            "asym_loss": asymmetric_loss(val_y, pred),
             "n_val": len(val_y),
             "train_end": str(df.iloc[train_idx].index.max().date()),
             "val_start": str(df.iloc[val_idx].index.min().date()),
@@ -615,6 +636,7 @@ def evaluate_ets_model_with_params(df, target_col, splits, trend, seasonal, damp
         "mae": mean_absolute_error(actuals, preds),
         "rmse": rmse(actuals, preds),
         "mape": safe_mape(actuals, preds),
+        "asym_loss": asymmetric_loss(actuals, preds),
         "n_preds": len(preds),
         "fold_metrics": fold_rows,
     }
@@ -647,6 +669,7 @@ def evaluate_sarimax(df, target_col, splits, order, seasonal_order):
             "mae": mean_absolute_error(val_y, pred),
             "rmse": rmse(val_y, pred),
             "mape": safe_mape(val_y, pred),
+            "asym_loss": asymmetric_loss(val_y, pred),
             "n_val": len(val_y),
             "train_end": str(df.iloc[train_idx].index.max().date()),
             "val_start": str(df.iloc[val_idx].index.min().date()),
@@ -657,6 +680,7 @@ def evaluate_sarimax(df, target_col, splits, order, seasonal_order):
         "mae": mean_absolute_error(actuals, preds),
         "rmse": rmse(actuals, preds),
         "mape": safe_mape(actuals, preds),
+        "asym_loss": asymmetric_loss(actuals, preds),
         "n_preds": len(preds),
         "fold_metrics": fold_rows,
     }
@@ -689,6 +713,7 @@ def evaluate_prophet_model(df, target_col, splits, enso_schema):
             "mae": mean_absolute_error(y_true, pred),
             "rmse": rmse(y_true, pred),
             "mape": safe_mape(y_true, pred),
+            "asym_loss": asymmetric_loss(y_true, pred),
             "n_val": len(y_true),
             "train_end": str(train_df.index.max().date()),
             "val_start": str(val_df.index.min().date()),
@@ -699,6 +724,7 @@ def evaluate_prophet_model(df, target_col, splits, enso_schema):
         "mae": mean_absolute_error(actuals, preds),
         "rmse": rmse(actuals, preds),
         "mape": safe_mape(actuals, preds),
+        "asym_loss": asymmetric_loss(actuals, preds),
         "n_preds": len(preds),
         "fold_metrics": fold_rows,
     }
@@ -766,7 +792,10 @@ def build_model_grid():
                     },
                 })
 
-    # --- HistGradientBoosting (direct, log-transformed) ---
+    # Quantile for asymmetric loss: lower quantile biases toward under-forecasting
+    _quantile = 1.0 / (1.0 + OVER_FORECAST_PENALTY)
+
+    # --- HistGradientBoosting (direct, log-transformed, quantile loss) ---
     for learning_rate in [0.05, 0.1]:
         for max_depth in [3, 5]:
             for min_samples_leaf in [5, 10]:
@@ -775,6 +804,8 @@ def build_model_grid():
                     "estimator": Pipeline([
                         ("imputer", SimpleImputer(strategy="median")),
                         ("model", HistGradientBoostingRegressor(
+                            loss="quantile",
+                            quantile=_quantile,
                             learning_rate=learning_rate,
                             max_depth=max_depth,
                             min_samples_leaf=min_samples_leaf,
@@ -791,7 +822,7 @@ def build_model_grid():
                     },
                 })
 
-    # --- XGBoost (if available) ---
+    # --- XGBoost (if available, quantile regression) ---
     if XGBOOST_AVAILABLE:
         for learning_rate in [0.05, 0.1]:
             for max_depth in [3, 5]:
@@ -807,7 +838,8 @@ def build_model_grid():
                                 subsample=0.9,
                                 colsample_bytree=0.9,
                                 reg_lambda=1.0,
-                                objective="reg:squarederror",
+                                objective="reg:quantileerror",
+                                quantile_alpha=_quantile,
                                 random_state=42,
                                 n_jobs=4,
                             )),
@@ -820,7 +852,7 @@ def build_model_grid():
                         },
                     })
 
-    # --- CatBoost (if available) ---
+    # --- CatBoost (if available, quantile loss) ---
     if CATBOOST_AVAILABLE:
         for depth in [4, 6]:
             for learning_rate in [0.05, 0.1]:
@@ -832,7 +864,7 @@ def build_model_grid():
                             depth=depth,
                             learning_rate=learning_rate,
                             iterations=400,
-                            loss_function="RMSE",
+                            loss_function=f"Quantile:alpha={_quantile:.4f}",
                             verbose=0,
                             random_seed=42,
                         )),
@@ -965,6 +997,7 @@ def fit_best_and_forecast(course_df, course_name, target_col, forecast_end, outp
                 "mae": score["mae"],
                 "rmse": score["rmse"],
                 "mape": score["mape"],
+                "asym_loss": score["asym_loss"],
                 "n_preds": score["n_preds"],
                 "params_json": json.dumps(item["params"], default=str),
                 "error": None,
@@ -980,15 +1013,16 @@ def fit_best_and_forecast(course_df, course_name, target_col, forecast_end, outp
                 "mae": np.nan,
                 "rmse": np.nan,
                 "mape": np.nan,
+                "asym_loss": np.nan,
                 "n_preds": np.nan,
                 "params_json": json.dumps(item["params"], default=str),
                 "error": str(e),
             })
 
-    results_df = pd.DataFrame(results).sort_values(["rmse", "mae", "mape"], na_position="last")
+    results_df = pd.DataFrame(results).sort_values(["asym_loss", "rmse", "mae"], na_position="last")
     results_df.to_csv(course_dir / "model_search_results.csv", index=False)
 
-    valid_results = results_df.dropna(subset=["rmse"]).copy()
+    valid_results = results_df.dropna(subset=["asym_loss"]).copy()
     if valid_results.empty:
         raise ValueError(f"All candidate models failed for {course_name}")
 
@@ -1036,16 +1070,16 @@ def fit_best_and_forecast(course_df, course_name, target_col, forecast_end, outp
     best_params = None
 
     # Always include seasonal naive in ensemble with a baseline weight
-    naive_rmse_row = valid_results[valid_results["model_family"] == "seasonal_naive"]
-    naive_rmse = float(naive_rmse_row["rmse"].iloc[0]) if len(naive_rmse_row) else 500.0
+    naive_asym_row = valid_results[valid_results["model_family"] == "seasonal_naive"]
+    naive_asym = float(naive_asym_row["asym_loss"].iloc[0]) if len(naive_asym_row) else 500.0
     all_model_preds.append(naive_pred)
-    model_weights.append(1.0 / (naive_rmse + 1e-8))
+    model_weights.append(1.0 / (naive_asym + 1e-8))
     model_families_used.append("seasonal_naive")
 
     for rank, (_, row) in enumerate(top_models.iterrows()):
         family = row["model_family"]
         params = json.loads(row["params_json"])
-        weight = 1.0 / (row["rmse"] + 1e-8)  # inverse-RMSE weighting
+        weight = 1.0 / (row["asym_loss"] + 1e-8)  # inverse-asymmetric-loss weighting
 
         if rank == 0:
             best_family = family
@@ -1139,6 +1173,8 @@ def fit_best_and_forecast(course_df, course_name, target_col, forecast_end, outp
         "best_cv_rmse": float(best["rmse"]),
         "best_cv_mae": float(best["mae"]),
         "best_cv_mape": float(best["mape"]),
+        "best_cv_asym_loss": float(best["asym_loss"]),
+        "over_forecast_penalty": OVER_FORECAST_PENALTY,
         "ensemble_n_models": len(all_model_preds),
         "ensemble_families": model_families_used,
         "ensemble_weights": dict(zip(model_families_used, model_weights.round(3).tolist())),
@@ -1152,7 +1188,9 @@ def fit_best_and_forecast(course_df, course_name, target_col, forecast_end, outp
             "Log1p-transformed target for ML models to handle extreme skew.",
             "Multiplicative ETS and SARIMAX added for proportional seasonality.",
             "Seasonal naive baseline included.",
-            "Top-K model ensemble weighted by inverse CV RMSE.",
+            f"Asymmetric loss: over-predictions penalised {OVER_FORECAST_PENALTY}x vs under-predictions.",
+            "Model selection and ensemble weighting use asymmetric loss.",
+            "Tree-based models (HGB, XGBoost, CatBoost) use quantile regression to bias low.",
             "Monthly historical profile features (month_hist_mean/median) replace lag features for future.",
         ],
         "package_availability": {
@@ -1253,6 +1291,7 @@ def _generate_forecast(family, params, train_df, future_df, future_idx,
 
 def _rebuild_estimator(family, params):
     """Reconstruct a sklearn Pipeline from family name and params."""
+    _quantile = 1.0 / (1.0 + OVER_FORECAST_PENALTY)
     if family == "ridge":
         return Pipeline([
             ("imputer", SimpleImputer(strategy="median")),
@@ -1282,6 +1321,8 @@ def _rebuild_estimator(family, params):
         return Pipeline([
             ("imputer", SimpleImputer(strategy="median")),
             ("model", HistGradientBoostingRegressor(
+                loss="quantile",
+                quantile=_quantile,
                 learning_rate=params["learning_rate"],
                 max_depth=params["max_depth"],
                 min_samples_leaf=params["min_samples_leaf"],
@@ -1296,7 +1337,8 @@ def _rebuild_estimator(family, params):
                 learning_rate=params["learning_rate"],
                 max_depth=params["max_depth"],
                 subsample=0.9, colsample_bytree=0.9, reg_lambda=1.0,
-                objective="reg:squarederror", random_state=42, n_jobs=4,
+                objective="reg:quantileerror", quantile_alpha=_quantile,
+                random_state=42, n_jobs=4,
             )),
         ])
     elif family == "catboost":
@@ -1305,7 +1347,8 @@ def _rebuild_estimator(family, params):
             ("model", CatBoostRegressor(
                 depth=params["depth"],
                 learning_rate=params["learning_rate"],
-                iterations=400, loss_function="RMSE", verbose=0, random_seed=42,
+                iterations=400, loss_function=f"Quantile:alpha={_quantile:.4f}",
+                verbose=0, random_seed=42,
             )),
         ])
     else:

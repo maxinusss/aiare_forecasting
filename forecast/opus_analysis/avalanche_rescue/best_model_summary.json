@@ -1,0 +1,51 @@
+{
+  "course": "avalanche rescue",
+  "best_model_family": "ridge",
+  "best_model_params": {
+    "alpha": 10.0,
+    "use_log": true
+  },
+  "best_cv_rmse": 114.4126145527589,
+  "best_cv_mae": 52.25800746687706,
+  "best_cv_mape": 81.44088781324542,
+  "best_cv_asym_loss": 65.73121761135486,
+  "over_forecast_penalty": 2.0,
+  "ensemble_n_models": 4,
+  "ensemble_families": [
+    "seasonal_naive",
+    "ridge",
+    "elasticnet",
+    "prophet"
+  ],
+  "ensemble_weights": {
+    "seasonal_naive": 0.234,
+    "ridge": 0.268,
+    "elasticnet": 0.251,
+    "prophet": 0.247
+  },
+  "train_start": "2017-07-01",
+  "train_end": "2026-02-01",
+  "forecast_start": "2026-05-01",
+  "forecast_end": "2027-08-01",
+  "enso_schema": [
+    "enso_ENSO-Neutral",
+    "enso_El Ni\u00f1o",
+    "enso_La Ni\u00f1a",
+    "enso_unknown"
+  ],
+  "notes": [
+    "Direct forecasting (no recursive lag degradation).",
+    "Log1p-transformed target for ML models to handle extreme skew.",
+    "Multiplicative ETS and SARIMAX added for proportional seasonality.",
+    "Seasonal naive baseline included.",
+    "Asymmetric loss: over-predictions penalised 2.0x vs under-predictions.",
+    "Model selection and ensemble weighting use asymmetric loss.",
+    "Tree-based models (HGB, XGBoost, CatBoost) use quantile regression to bias low.",
+    "Monthly historical profile features (month_hist_mean/median) replace lag features for future."
+  ],
+  "package_availability": {
+    "prophet": true,
+    "xgboost": true,
+    "catboost": true
+  }
+}

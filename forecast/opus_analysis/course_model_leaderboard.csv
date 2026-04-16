@@ -1,0 +1,4 @@
+course,best_model_family,best_model_params,best_cv_rmse,best_cv_mae,best_cv_mape,ensemble_n_models
+aiare 2,seasonal_naive,{},31.093943676113735,14.801587301587302,35.860182692921796,3
+avalanche rescue,ridge,"{'alpha': 10.0, 'use_log': True}",114.4126145527589,52.25800746687706,81.44088781324542,4
+aiare 1,prophet,"{'yearly_seasonality': True, 'seasonality_mode': 'multiplicative'}",461.0321206272504,217.1226751062748,141.79384630198794,3

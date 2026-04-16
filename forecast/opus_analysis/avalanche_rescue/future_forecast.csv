@@ -1,0 +1,17 @@
+date,combined_course,forecast_num_students,forecast_single_best,best_model_family,best_model_params,ensemble_n_models
+2026-05-01,avalanche rescue,44.80696421988839,4.7832403642542385,ridge,"{""alpha"": 10.0, ""use_log"": true}",4
+2026-06-01,avalanche rescue,5.559312167421849,4.903498668839147,ridge,"{""alpha"": 10.0, ""use_log"": true}",4
+2026-07-01,avalanche rescue,6.980882520729397,12.022529478729497,ridge,"{""alpha"": 10.0, ""use_log"": true}",4
+2026-08-01,avalanche rescue,10.738473718177609,18.294016561902122,ridge,"{""alpha"": 10.0, ""use_log"": true}",4
+2026-09-01,avalanche rescue,2.365590056054033,4.609648624918581,ridge,"{""alpha"": 10.0, ""use_log"": true}",4
+2026-10-01,avalanche rescue,2.406378666464542,3.855212865899058,ridge,"{""alpha"": 10.0, ""use_log"": true}",4
+2026-11-01,avalanche rescue,12.03401067493683,17.71531607510147,ridge,"{""alpha"": 10.0, ""use_log"": true}",4
+2026-12-01,avalanche rescue,311.0524448620861,431.3529513164375,ridge,"{""alpha"": 10.0, ""use_log"": true}",4
+2027-01-01,avalanche rescue,533.1919581784465,826.9815044369777,ridge,"{""alpha"": 10.0, ""use_log"": true}",4
+2027-02-01,avalanche rescue,359.7775280460477,443.427376887394,ridge,"{""alpha"": 10.0, ""use_log"": true}",4
+2027-03-01,avalanche rescue,286.2449907329976,163.28163240865402,ridge,"{""alpha"": 10.0, ""use_log"": true}",4
+2027-04-01,avalanche rescue,90.90131620899625,36.955246094040604,ridge,"{""alpha"": 10.0, ""use_log"": true}",4
+2027-05-01,avalanche rescue,44.75714489574058,4.629034494522565,ridge,"{""alpha"": 10.0, ""use_log"": true}",4
+2027-06-01,avalanche rescue,5.501578648928385,4.738009375270198,ridge,"{""alpha"": 10.0, ""use_log"": true}",4
+2027-07-01,avalanche rescue,6.8462947426358856,11.63968497114448,ridge,"{""alpha"": 10.0, ""use_log"": true}",4
+2027-08-01,avalanche rescue,10.067348939146536,17.70047613739195,ridge,"{""alpha"": 10.0, ""use_log"": true}",4

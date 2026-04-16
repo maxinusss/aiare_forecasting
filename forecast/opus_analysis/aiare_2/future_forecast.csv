@@ -1,0 +1,17 @@
+date,combined_course,forecast_num_students,forecast_single_best,best_model_family,best_model_params,ensemble_n_models
+2026-05-01,aiare 2,54.22325734303994,148.0,seasonal_naive,{},3
+2026-06-01,aiare 2,13.162604701575306,30.0,seasonal_naive,{},3
+2026-07-01,aiare 2,3.90567845355737,0.0,seasonal_naive,{},3
+2026-08-01,aiare 2,6.383544599123114,0.0,seasonal_naive,{},3
+2026-09-01,aiare 2,2.526603260709824,0.0,seasonal_naive,{},3
+2026-10-01,aiare 2,3.4115136303024163,3.0,seasonal_naive,{},3
+2026-11-01,aiare 2,5.997544567223425,0.0,seasonal_naive,{},3
+2026-12-01,aiare 2,38.75668974444292,0.0,seasonal_naive,{},3
+2027-01-01,aiare 2,143.9111942048649,0.0,seasonal_naive,{},3
+2027-02-01,aiare 2,149.11067381649292,22.0,seasonal_naive,{},3
+2027-03-01,aiare 2,163.09664955804072,164.0,seasonal_naive,{},3
+2027-04-01,aiare 2,68.70043632892802,162.0,seasonal_naive,{},3
+2027-05-01,aiare 2,54.21792868961065,148.0,seasonal_naive,{},3
+2027-06-01,aiare 2,13.15736993899467,30.0,seasonal_naive,{},3
+2027-07-01,aiare 2,3.813127174583122,0.0,seasonal_naive,{},3
+2027-08-01,aiare 2,6.302457792954591,0.0,seasonal_naive,{},3

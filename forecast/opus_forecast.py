@@ -14,13 +14,28 @@ Key fixes over chat_3_forecast_full_restored.py:
    weighting use the asymmetric metric.  Controlled by OVER_FORECAST_PENALTY.
 """
 
+import faulthandler
 import json
+import logging
+import time
+import traceback
 import warnings
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
+
+faulthandler.enable()
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+
+# ---------- Logging setup ----------
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%H:%M:%S",
+)
+log = logging.getLogger(__name__)
 from sklearn.base import clone
 from sklearn.ensemble import HistGradientBoostingRegressor, RandomForestRegressor
 from sklearn.impute import SimpleImputer
@@ -40,18 +55,21 @@ CATBOOST_AVAILABLE = True
 
 try:
     from prophet import Prophet
-except Exception:
+except Exception as e:
     PROPHET_AVAILABLE = False
+    log.info("Prophet not available: %s", e)
 
 try:
     from xgboost import XGBRegressor
-except Exception:
+except Exception as e:
     XGBOOST_AVAILABLE = False
+    log.info("XGBoost not available: %s", e)
 
 try:
     from catboost import CatBoostRegressor
-except Exception:
+except Exception as e:
     CATBOOST_AVAILABLE = False
+    log.info("CatBoost not available: %s", e)
 
 
 # =========================
@@ -62,14 +80,14 @@ TARGET_COL = "num_students"
 COURSE_COL = "combined_course"
 DATE_COL = "date"
 FORECAST_END = "2027-08-01"
-OUTPUT_DIR = "opus_analysis"
+OUTPUT_DIR = "opus_analysis_updated2526_lower_overforecast_penalty"
 REPORTING_LAG_MONTHS = 2
 # Number of top models to ensemble (set to 1 to disable ensembling)
 ENSEMBLE_TOP_K = 3
 # Asymmetric loss: penalize over-forecasting more than under-forecasting.
 # Values > 1 penalize over-prediction; e.g. 2.0 means over-predictions are
 # penalized 2x as much as under-predictions in model selection & ensembling.
-OVER_FORECAST_PENALTY = 2.0
+OVER_FORECAST_PENALTY = 1.5
 
 
 # =========================
@@ -382,9 +400,10 @@ def fit_predict_ets(train_y, forecast_steps, trend, seasonal, damped_trend):
         fitted = model.fit(optimized=True, use_brute=True)
         pred = fitted.forecast(forecast_steps)
         return np.clip(np.asarray(pred, dtype=float), 0.0, None), fitted
-    except Exception:
+    except Exception as e:
         # Fallback if multiplicative fails (e.g. zeros in data)
         if seasonal == "mul" or trend == "mul":
+            log.debug("ETS mul failed, falling back to additive: %s", e)
             return fit_predict_ets(
                 train_y, forecast_steps,
                 trend="add" if trend else None,
@@ -394,10 +413,10 @@ def fit_predict_ets(train_y, forecast_steps, trend, seasonal, damped_trend):
         raise
 
 
-def fit_predict_sarimax(train_y, forecast_steps, order=(1, 0, 1), seasonal_order=(1, 1, 1, 12)):
-    """SARIMAX: captures seasonal patterns via seasonal differencing."""
+def _sarimax_fit_core(train_y, forecast_steps, order, seasonal_order):
+    """Core SARIMAX fitting — may crash at C level in LAPACK."""
     model = SARIMAX(
-        train_y.astype(float),
+        np.asarray(train_y, dtype=float),
         order=order,
         seasonal_order=seasonal_order,
         enforce_stationarity=False,
@@ -405,7 +424,19 @@ def fit_predict_sarimax(train_y, forecast_steps, order=(1, 0, 1), seasonal_order
     )
     fitted = model.fit(disp=False, maxiter=200)
     pred = fitted.forecast(forecast_steps)
-    return np.clip(np.asarray(pred, dtype=float), 0.0, None), fitted
+    fittedvalues = fitted.fittedvalues.values.astype(float)
+    return np.clip(np.asarray(pred, dtype=float), 0.0, None), fittedvalues
+
+
+def fit_predict_sarimax(train_y, forecast_steps, order=(1, 0, 1), seasonal_order=(1, 1, 1, 12)):
+    """SARIMAX: captures seasonal patterns via seasonal differencing."""
+    pred, fittedvalues = _sarimax_fit_core(train_y, forecast_steps, order, seasonal_order)
+    return pred, fittedvalues
+
+
+def _evaluate_sarimax_subprocess(df, target_col, splits, order, seasonal_order):
+    """Run evaluate_sarimax in a subprocess to survive C-level LAPACK crashes."""
+    return evaluate_sarimax(df, target_col, splits, order, seasonal_order)
 
 
 def direct_forecast_sklearn(model, train_df, future_df, target_col, enso_schema, use_log=True):
@@ -614,7 +645,8 @@ def evaluate_ets_model_with_params(df, target_col, splits, trend, seasonal, damp
                 seasonal=seasonal,
                 damped_trend=damped_trend,
             )
-        except Exception:
+        except Exception as e:
+            log.debug("  ETS fold %d fallback to mean: %s", fold_num, e)
             pred = np.full(len(val_idx), np.nanmean(train_y))
 
         pred = np.clip(pred, 0.0, None)
@@ -658,7 +690,8 @@ def evaluate_sarimax(df, target_col, splits, order, seasonal_order):
                 order=order,
                 seasonal_order=seasonal_order,
             )
-        except Exception:
+        except Exception as e:
+            log.debug("  SARIMAX fold %d fallback to mean: %s", fold_num, e)
             pred = np.full(len(val_idx), np.nanmean(train_y))
 
         pred = np.clip(pred, 0.0, None)
@@ -702,7 +735,8 @@ def evaluate_prophet_model(df, target_col, splits, enso_schema):
                 target_col=target_col,
                 enso_schema=enso_schema,
             )
-        except Exception:
+        except Exception as e:
+            log.debug("  Prophet fold %d fallback to mean: %s", fold_num, e)
             pred = np.full(len(val_idx), train_df[target_col].mean())
 
         y_true = val_df[target_col].values.astype(float)
@@ -929,10 +963,12 @@ def fit_best_and_forecast(course_df, course_name, target_col, forecast_end, outp
 
     df = course_df.copy().sort_index()
     enso_schema = get_enso_schema(df)
+    log.info("  ENSO schema: %s", enso_schema)
 
     selection_df = df.copy()
     if REPORTING_LAG_MONTHS > 0 and len(selection_df) > REPORTING_LAG_MONTHS + 24:
         selection_df = selection_df.iloc[:-REPORTING_LAG_MONTHS].copy()
+    log.info("  Selection data: %d months (after reporting lag trim)", len(selection_df))
 
     splits = time_series_cv_splits(
         n_obs=len(selection_df),
@@ -944,11 +980,18 @@ def fit_best_and_forecast(course_df, course_name, target_col, forecast_end, outp
 
     if not splits:
         raise ValueError(f"Not enough history to create validation splits for {course_name}")
+    log.info("  CV splits: %d folds", len(splits))
 
     model_grid = build_model_grid()
+    log.info("  Model grid: %d candidates", len(model_grid))
     results = []
+    grid_t0 = time.time()
+    n_success = 0
+    n_fail = 0
 
     for i, item in enumerate(model_grid, start=1):
+        model_t0 = time.time()
+        log.info("  [%d/%d] Evaluating %s ...", i, len(model_grid), item["model_family"])
         try:
             if item["model_family"] == "seasonal_naive":
                 score = evaluate_seasonal_naive(selection_df, target_col, splits)
@@ -964,13 +1007,15 @@ def fit_best_and_forecast(course_df, course_name, target_col, forecast_end, outp
                 )
 
             elif item["model_family"] == "sarimax":
-                score = evaluate_sarimax(
-                    df=selection_df,
-                    target_col=target_col,
-                    splits=splits,
-                    order=tuple(item["params"]["order"]),
-                    seasonal_order=tuple(item["params"]["seasonal_order"]),
-                )
+                # Run entire evaluation in subprocess to survive C-level LAPACK crashes
+                with ProcessPoolExecutor(max_workers=1) as pool:
+                    future = pool.submit(
+                        _evaluate_sarimax_subprocess,
+                        selection_df, target_col, splits,
+                        tuple(item["params"]["order"]),
+                        tuple(item["params"]["seasonal_order"]),
+                    )
+                    score = future.result(timeout=300)
 
             elif item["model_family"] == "prophet":
                 score = evaluate_prophet_model(
@@ -1005,8 +1050,13 @@ def fit_best_and_forecast(course_df, course_name, target_col, forecast_end, outp
 
             with open(course_dir / f'cv_folds_{item["model_family"]}_{i:03d}.json', "w") as f:
                 json.dump(score["fold_metrics"], f, indent=2)
+            n_success += 1
+            log.info("    OK (RMSE=%.1f, %.1fs)", score["rmse"], time.time() - model_t0)
 
         except Exception as e:
+            n_fail += 1
+            log.warning("  Model %d/%d [%s] FAILED (%.1fs): %s",
+                        i, len(model_grid), item["model_family"], time.time() - model_t0, e)
             results.append({
                 "course": course_name,
                 "model_family": item["model_family"],
@@ -1021,10 +1071,17 @@ def fit_best_and_forecast(course_df, course_name, target_col, forecast_end, outp
 
     results_df = pd.DataFrame(results).sort_values(["asym_loss", "rmse", "mae"], na_position="last")
     results_df.to_csv(course_dir / "model_search_results.csv", index=False)
+    log.info("  CV grid done in %.1fs: %d succeeded, %d failed",
+             time.time() - grid_t0, n_success, n_fail)
 
     valid_results = results_df.dropna(subset=["asym_loss"]).copy()
     if valid_results.empty:
         raise ValueError(f"All candidate models failed for {course_name}")
+    log.info("  Top 5 models by asym_loss:")
+    for _, r in valid_results.head(5).iterrows():
+        log.info("    %s — asym=%.1f, rmse=%.1f, mae=%.1f%s",
+                 r["model_family"], r["asym_loss"], r["rmse"], r["mae"],
+                 f" (error: {r['error']})" if r.get("error") else "")
 
     # --- Generate forecasts from top-K models and ensemble ---
     final_train = df.copy()
@@ -1059,6 +1116,10 @@ def fit_best_and_forecast(course_df, course_name, target_col, forecast_end, outp
 
     # ---- Generate seasonal naive as the anchor forecast ----
     naive_pred = seasonal_naive_forecast(final_train[target_col], len(future_idx))
+    log.info("  Forecast horizon: %d months (%s to %s)",
+             len(future_idx),
+             future_idx.min().date() if len(future_idx) else '?',
+             future_idx.max().date() if len(future_idx) else '?')
 
     # ---- Collect forecasts from top-K models ----
     top_k = min(ENSEMBLE_TOP_K, len(valid_results))
@@ -1097,15 +1158,15 @@ def fit_best_and_forecast(course_df, course_name, target_col, forecast_end, outp
             # Sanity check: reject forecasts that are degenerate
             # (peak month should be at least 10% of seasonal naive peak)
             if naive_pred.max() > 0 and pred.max() < 0.1 * naive_pred.max():
-                print(f"  Rejecting {family} forecast: peak={pred.max():.1f} "
-                      f"vs naive peak={naive_pred.max():.1f} (< 10%)")
+                log.warning("  Rejecting %s forecast: peak=%.1f vs naive peak=%.1f (< 10%%)",
+                            family, pred.max(), naive_pred.max())
                 continue
 
             all_model_preds.append(pred)
             model_weights.append(weight)
             model_families_used.append(family)
         except Exception as e:
-            print(f"  Warning: failed to generate forecast for {family} ({params}): {e}")
+            log.warning("  Failed to generate forecast for %s: %s", family, e)
 
     # Weighted ensemble
     model_weights = np.array(model_weights)
@@ -1115,8 +1176,8 @@ def fit_best_and_forecast(course_df, course_name, target_col, forecast_end, outp
         ensemble_pred += w * pred
     future_pred = np.clip(ensemble_pred, 0.0, None)
 
-    print(f"  Ensemble: {len(all_model_preds)} models, families={model_families_used}")
-    print(f"  Ensemble weights: {dict(zip(model_families_used, model_weights.round(3)))}")
+    log.info("  Ensemble: %d models, families=%s", len(all_model_preds), model_families_used)
+    log.info("  Ensemble weights: %s", dict(zip(model_families_used, model_weights.round(3))))
 
     # Also get the single best model prediction for comparison
     single_best_pred = all_model_preds[0] if best_family == "seasonal_naive" else (
@@ -1124,6 +1185,7 @@ def fit_best_and_forecast(course_df, course_name, target_col, forecast_end, outp
     )
 
     # ---- Backtest the best model on last CV fold ----
+    log.info("  Running backtest on last CV fold...")
     last_train_idx, last_val_idx = splits[-1]
     bt_train = selection_df.iloc[last_train_idx].copy()
     bt_val = selection_df.iloc[last_val_idx].copy()
@@ -1157,6 +1219,7 @@ def fit_best_and_forecast(course_df, course_name, target_col, forecast_end, outp
     })
     forecast_df.to_csv(course_dir / "future_forecast.csv", index=False)
     plot_backtest.to_csv(course_dir / "backtest_actual_vs_pred.csv", index=False)
+    log.info("  Saved forecast CSV and backtest CSV to %s", course_dir)
 
     fitted_df = pd.DataFrame({
         "date": final_train.index,
@@ -1257,12 +1320,13 @@ def _generate_forecast(family, params, train_df, future_df, future_idx,
         return np.clip(pred, 0.0, None)
 
     elif family == "sarimax":
-        pred, _ = fit_predict_sarimax(
-            train_y=train_df[target_col].values,
-            forecast_steps=len(future_idx),
-            order=tuple(params["order"]),
-            seasonal_order=tuple(params["seasonal_order"]),
-        )
+        with ProcessPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(
+                _sarimax_fit_core,
+                train_df[target_col].values, len(future_idx),
+                tuple(params["order"]), tuple(params["seasonal_order"]),
+            )
+            pred, _ = future.result(timeout=120)
         return np.clip(pred, 0.0, None)
 
     elif family == "prophet":
@@ -1381,14 +1445,14 @@ def _get_fitted_in_sample(family, params, train_df, target_col, enso_schema):
             return np.clip(model.fittedvalues.values.astype(float), 0.0, None)
 
         elif family == "sarimax":
-            model = SARIMAX(
-                train_df[target_col].astype(float),
-                order=tuple(params["order"]),
-                seasonal_order=tuple(params["seasonal_order"]),
-                enforce_stationarity=False,
-                enforce_invertibility=False,
-            ).fit(disp=False, maxiter=200)
-            return np.clip(model.fittedvalues.values.astype(float), 0.0, None)
+            with ProcessPoolExecutor(max_workers=1) as pool:
+                future = pool.submit(
+                    _sarimax_fit_core,
+                    train_df[target_col].values, 1,
+                    tuple(params["order"]), tuple(params["seasonal_order"]),
+                )
+                _, fittedvalues = future.result(timeout=120)
+            return np.clip(fittedvalues, 0.0, None)
 
         elif family == "prophet":
             _, _, _, fitted = fit_predict_prophet(
@@ -1413,7 +1477,8 @@ def _get_fitted_in_sample(family, params, train_df, target_col, enso_schema):
                 y_hat = np.expm1(y_hat)
             return np.clip(y_hat, 0.0, None)
 
-    except Exception:
+    except Exception as e:
+        log.warning("  _get_fitted_in_sample failed for %s, using raw actuals: %s", family, e)
         return train_df[target_col].values.astype(float)
 
 
@@ -1421,43 +1486,67 @@ def _get_fitted_in_sample(family, params, train_df, target_col, enso_schema):
 # Main
 # =========================
 def main():
+    t0 = time.time()
     script_dir = Path(__file__).resolve().parent
     input_path = script_dir.parent / "data/cleaned_data" / INPUT_CSV
     output_dir = script_dir / OUTPUT_DIR
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    log.info("Reading input data from %s", input_path)
     raw = pd.read_csv(input_path)
     raw[DATE_COL] = pd.to_datetime(raw[DATE_COL])
+    courses = sorted(raw[COURSE_COL].dropna().unique())
+    log.info("Loaded %d rows, %d columns, %d courses: %s",
+             len(raw), len(raw.columns), len(courses), courses)
+    log.info("Date range: %s to %s", raw[DATE_COL].min(), raw[DATE_COL].max())
+    log.info("Package availability — Prophet: %s, XGBoost: %s, CatBoost: %s",
+             PROPHET_AVAILABLE, XGBOOST_AVAILABLE, CATBOOST_AVAILABLE)
 
     all_course_summaries = []
     all_forecasts = []
 
-    for course_name in sorted(raw[COURSE_COL].dropna().unique()):
-        print(f"\n{'='*60}")
-        print(f"Running course: {course_name}")
-        print(f"{'='*60}")
-        course_df = prepare_monthly_series(raw, course_name, TARGET_COL)
-        summary = fit_best_and_forecast(
-            course_df=course_df,
-            course_name=course_name,
-            target_col=TARGET_COL,
-            forecast_end=FORECAST_END,
-            output_dir=output_dir,
-        )
-        all_course_summaries.append(summary)
-        print(f"  Best: {summary['best_model_family']} "
-              f"(RMSE={summary['best_cv_rmse']:.1f}, "
-              f"ensemble={summary['ensemble_n_models']} models)")
+    for idx, course_name in enumerate(courses, start=1):
+        log.info("")
+        log.info("=" * 60)
+        log.info("[%d/%d] Running course: %s", idx, len(courses), course_name)
+        log.info("=" * 60)
+        course_t0 = time.time()
+        try:
+            course_df = prepare_monthly_series(raw, course_name, TARGET_COL)
+            log.info("  Prepared series: %d months, range %s to %s",
+                     len(course_df), course_df.index.min().date(), course_df.index.max().date())
 
-        course_folder = output_dir / sanitize_name(course_name)
-        fc = pd.read_csv(course_folder / "future_forecast.csv")
-        all_forecasts.append(fc)
+            summary = fit_best_and_forecast(
+                course_df=course_df,
+                course_name=course_name,
+                target_col=TARGET_COL,
+                forecast_end=FORECAST_END,
+                output_dir=output_dir,
+            )
+            all_course_summaries.append(summary)
+            log.info("  Best: %s (RMSE=%.1f, ensemble=%d models) [%.1fs]",
+                     summary['best_model_family'], summary['best_cv_rmse'],
+                     summary['ensemble_n_models'], time.time() - course_t0)
+
+            course_folder = output_dir / sanitize_name(course_name)
+            fc = pd.read_csv(course_folder / "future_forecast.csv")
+            all_forecasts.append(fc)
+        except Exception:
+            log.error("FAILED on course '%s' after %.1fs:\n%s",
+                      course_name, time.time() - course_t0, traceback.format_exc())
+            continue
+
+    if not all_course_summaries:
+        log.error("No courses completed successfully. Exiting.")
+        return
 
     leaderboard = pd.DataFrame(all_course_summaries).sort_values(["best_cv_rmse", "best_cv_mae"])
     leaderboard.to_csv(output_dir / "course_model_leaderboard.csv", index=False)
+    log.info("Saved leaderboard: %d courses", len(leaderboard))
 
     combined_forecasts = pd.concat(all_forecasts, ignore_index=True)
     combined_forecasts.to_csv(output_dir / "all_courses_future_forecasts.csv", index=False)
+    log.info("Saved combined forecasts: %d rows", len(combined_forecasts))
 
     plt.figure(figsize=(14, 7))
     for course_name in combined_forecasts["combined_course"].unique():
@@ -1479,7 +1568,9 @@ def main():
     with open(output_dir / "package_availability.json", "w") as f:
         json.dump(availability, f, indent=2)
 
-    print(f"\nDone. Outputs saved to: {output_dir.resolve()}")
+    elapsed = time.time() - t0
+    log.info("Done. %d/%d courses succeeded in %.1fs. Outputs saved to: %s",
+             len(all_course_summaries), len(courses), elapsed, output_dir.resolve())
 
 
 if __name__ == "__main__":

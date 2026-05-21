@@ -298,20 +298,22 @@ def get_us_course_price_no_outliers(course_location_df: pd.DataFrame, output_pat
     final.to_csv(output_path, index=False)
     return final
 
-#combine course and student information at correct level and only after 2017
-courses = combine_course_enrollment(
-    "data/raw_data/Courses", "data/cleaned_data/course_enrollment.csv"
-).drop(columns=["course"])
-students = combine_student_counts(
-    "data/raw_data/Students", "data/cleaned_data/student_enrollment.csv"
-)
-course_location = combine_course_by_location_price(
-    "data/raw_data/Courses", "data/cleaned_data/course_location_price.csv"
-)
-course_prices = get_us_course_price_no_outliers(
-    course_location, "data/cleaned_data/course_price_us.csv")
 
-master_data = merge_dataframes_on_keys(dfs=[courses.drop('student_price', axis =1), students, course_prices], keys=["month", "year", "combined_course"])
-master_data = master_data[master_data["year"] >= 2017].copy()  # filter to 2017
-master_data.sort_values(['combined_course', 'year', 'month'], inplace=True)
-master_data.to_csv("data/cleaned_data/master_data.csv", index=False)
+if __name__ == "__main__":
+    #combine course and student information at correct level and only after 2017
+    courses = combine_course_enrollment(
+        "data/raw_data/Courses", "data/cleaned_data/course_enrollment.csv"
+    ).drop(columns=["course"])
+    students = combine_student_counts(
+        "data/raw_data/Students", "data/cleaned_data/student_enrollment.csv"
+    )
+    course_location = combine_course_by_location_price(
+        "data/raw_data/Courses", "data/cleaned_data/course_location_price.csv"
+    )
+    course_prices = get_us_course_price_no_outliers(
+        course_location, "data/cleaned_data/course_price_us.csv")
+
+    master_data = merge_dataframes_on_keys(dfs=[courses.drop('student_price', axis =1), students, course_prices], keys=["month", "year", "combined_course"])
+    master_data = master_data[master_data["year"] >= 2017].copy()  # filter to 2017
+    master_data.sort_values(['combined_course', 'year', 'month'], inplace=True)
+    master_data.to_csv("data/cleaned_data/master_data.csv", index=False)

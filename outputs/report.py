@@ -18,8 +18,8 @@ import pandas as pd
 
 # ── paths ──────────────────────────────────────────────────────────────────
 ROOT = Path(__file__).resolve().parent.parent
-ANALYSIS_DIR = ROOT / "forecast" / "opus_analysis"
-OUTPUT_HTML = ROOT / "outputs" / "aiare_forecast_report.html"
+ANALYSIS_DIR = ROOT / "forecast" / "opus_analysis_updated2526_lower_overforecast_penalty"
+OUTPUT_HTML = ROOT / "outputs" / "aiare_forecast_report_1.5xpenalty.html"
 
 # 26/27 winter season boundaries
 ANNUAL_START = pd.Timestamp("2026-07-01")

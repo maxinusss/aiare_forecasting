@@ -52,5 +52,7 @@ merged = merged.merge(fred_data, on=["year", "month"], how="left")
 
 
 #-------SAVE OUT DATA --------#
+merged = merged[merged["date"] <= pd.Timestamp("2026-05-31")]
+merged = merged[merged['enrolled']>0]
 merged.to_csv("data/cleaned_data/master_data_full.csv", index=False)
 
